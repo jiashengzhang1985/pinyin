@@ -1,0 +1,23 @@
+{
+  "private": true,
+  "author": "",
+  "scripts": {
+    "dev": "umi dev",
+    "build": "umi build",
+    "postinstall": "umi setup",
+    "setup": "umi setup",
+    "start": "npm run dev"
+  },
+  "dependencies": {
+    "hanzi-writer": "^3.7.3",
+    "pinyin-pro": "^3.28.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "umi": "^4.6.24"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.3"
+  }
+}

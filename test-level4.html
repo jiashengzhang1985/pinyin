@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Level 4 Character Consistency Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .character-display {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            border: 2px solid #2196f3;
+        }
+        .target-list {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .target-item {
+            padding: 10px 15px;
+            background: #ffeb3b;
+            border-radius: 6px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #4caf50;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Level 4 字符一致性测试</h1>
+
+        <div class="test-section">
+            <h2>测试场景：字符显示一致性</h2>
+            <p>这个测试验证目标字符显示与掉落字符是否完全一致</p>
+
+            <div class="character-display" id="currentCharacter">
+                我
+            </div>
+
+            <div class="target-list" id="targetList">
+                <!-- 动态生成目标字符 -->
+            </div>
+
+            <button onclick="generateTargets()">生成新目标</button>
+            <button onclick="simulateSuccess()">模拟成功识别</button>
+            <button onclick="resetTest()">重置测试</button>
+
+            <div id="testResult" class="test-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>测试日志</h2>
+            <div id="testLog" style="font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; background: #f5f5f5; padding: 10px; border-radius: 4px;">
+                <!-- 测试日志 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟 Level 4 的状态管理
+        let currentCharacter = '我';
+        let hanziList = '我是中国人爱我中华';
+        let targets = [];
+        let successCount = 0;
+
+        function log(message) {
+            const logDiv = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 模拟 createTarget 函数
+        function createTarget(character) {
+            log(`createTarget called with character: "${character}"`);
+            return {
+                id: Date.now() + Math.random(),
+                text: character || '我',
+                x: Math.random() * 700 + 50,
+                y: -30,
+                speed: 1.2
+            };
+        }
+
+        // 生成目标字符
+        function generateTargets() {
+            log('=== 生成目标测试 ===');
+            const count = 3; // 同时掉落数量
+
+            // 清除现有目标
+            targets = [];
+
+            // 生成新目标，使用当前字符
+            for (let i = 0; i < count; i++) {
+                const target = createTarget(currentCharacter);
+                targets.push(target);
+                log(`生成目标 ${i + 1}: "${target.text}"`);
+            }
+
+            // 更新显示
+            updateDisplay();
+
+            // 验证一致性
+            verifyConsistency();
+        }
+
+        // 更新显示
+        function updateDisplay() {
+            document.getElementById('currentCharacter').textContent = currentCharacter;
+
+            const targetList = document.getElementById('targetList');
+            targetList.innerHTML = '';
+
+            targets.forEach((target, index) => {
+                const item = document.createElement('div');
+                item.className = 'target-item';
+                item.textContent = target.text;
+                item.style.left = target.x + 'px';
+                item.style.top = target.y + 'px';
+                targetList.appendChild(item);
+            });
+        }
+
+        // 验证一致性
+        function verifyConsistency() {
+            const resultDiv = document.getElementById('testResult');
+
+            if (targets.length === 0) {
+                resultDiv.className = 'test-result fail';
+                resultDiv.textContent = '❌ 没有目标字符生成';
+                return;
+            }
+
+            const allMatch = targets.every(target => target.text === currentCharacter);
+
+            if (allMatch) {
+                resultDiv.className = 'test-result pass';
+                resultDiv.textContent = `✅ 所有目标字符与当前字符 "${currentCharacter}" 一致`;
+                log('一致性验证通过');
+            } else {
+                resultDiv.className = 'test-result fail';
+                const mismatched = targets.filter(t => t.text !== currentCharacter);
+                resultDiv.textContent = `❌ 发现不一致！当前字符: "${currentCharacter}"，但发现: ${mismatched.map(t => `"${t.text}"`).join(', ')}`;
+                log(`一致性验证失败：发现 ${mismatched.length} 个不一致的目标`);
+            }
+        }
+
+        // 模拟成功识别
+        function simulateSuccess() {
+            log('=== 模拟成功识别 ===');
+
+            if (targets.length === 0) {
+                log('没有目标可以识别');
+                return;
+            }
+
+            // 模拟切换到下一个字符
+            const characters = hanziList.split('').filter(char => char.trim());
+            const currentIndex = characters.indexOf(currentCharacter);
+            const nextIndex = (currentIndex + 1) % characters.length;
+            const nextCharacter = characters[nextIndex];
+
+            log(`准备从 "${currentCharacter}" 切换到 "${nextCharacter}"`);
+
+            // 模拟延迟切换
+            setTimeout(() => {
+                currentCharacter = nextCharacter;
+                successCount++;
+
+                log(`已切换到下一个字符: "${currentCharacter}"`);
+                log(`成功次数: ${successCount}`);
+
+                // 生成新目标
+                generateTargets();
+            }, 1000);
+        }
+
+        // 重置测试
+        function resetTest() {
+            log('=== 重置测试 ===');
+            currentCharacter = '我';
+            targets = [];
+            successCount = 0;
+            updateDisplay();
+            document.getElementById('testResult').innerHTML = '';
+            log('测试已重置');
+        }
+
+        // 初始化
+        log('Level 4 字符一致性测试已启动');
+        log(`初始字符列表: "${hanziList}"`);
+        log(`当前字符: "${currentCharacter}"`);
+        generateTargets();
+    </script>
+</body>
+</html>

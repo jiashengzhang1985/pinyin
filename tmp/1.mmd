@@ -1,0 +1,50 @@
+  graph TB
+      subgraph "Docker Network: monitoring"
+          P[Prometheus<br/>prom/prometheus:v3.7.0<br/>Port: 9090]
+          G[Grafana<br/>grafana/grafana:12.3.0<br/>Port: 443 → 3000]
+          LHE[LLM Health Exporter<br/>harbor.fortihawkeye.com/autotest/cus-llb-exporter:v3<br/>Port: 19300]
+          AP[Alert Handler<br/>harbor.fortihawkeye.com/autotest/cus_ai_alert_process:v2<br/>Port: 18081]
+      end
+
+      subgraph "External Services"
+          SMTP[smtp.gmail.com:465]
+      end
+
+      subgraph "Monitored Nodes (T1-LAB Datacenter)"
+          RTX1[RTX-1<br/>10.83.135.206<br/>Ports: 19100, 19400]
+          H2001[H200-1<br/>10.83.135.205<br/>Ports: 19100, 19400]
+          H1001[H100-1<br/>10.83.135.212<br/>Ports: 19100, 19400]
+          B2002[B200-2<br/>10.83.135.209<br/>Ports: 19100, 19400]
+          B2001[B200-1<br/>10.83.135.199<br/>Ports: 19100, 19400]
+      end
+
+      subgraph "LLM API Endpoints"
+          QWEN3[dev-forti-qwen3-coder<br/>10.83.135.199:7001]
+          CODER[dev-forti-coder<br/>10.83.135.209:7001]
+      end
+
+      P -->|scrapes metrics| RTX1
+      P -->|scrapes metrics| H2001
+      P -->|scrapes metrics| H1001
+      P -->|scrapes metrics| B2002
+      P -->|scrapes metrics| B2001
+
+      P -->|scrapes health| LHE
+      LHE -->|health checks| QWEN3
+      LHE -->|health checks| CODER
+
+      G -->|queries data| P
+      G -->|sends alerts| AP
+      AP -->|sends notifications| SMTP
+
+      P -.->|rule evaluation| P
+      AP -->|SSH management| RTX1
+      AP -->|SSH management| H2001
+      AP -->|SSH management| H1001
+      AP -->|SSH management| B2002
+      AP -->|SSH management| B2001
+
+      style P fill:#e1f5fe
+      style G fill:#e1f5fe
+      style LHE fill:#fff3e0
+      style AP fill:#fff3e0

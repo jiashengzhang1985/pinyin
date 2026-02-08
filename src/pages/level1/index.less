@@ -1,0 +1,144 @@
+.level-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  padding: 20px;
+  display: flex;
+  gap: 20px;
+}
+
+.game-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.level-header {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  position: relative;
+
+  .back-home-btn {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+
+    &:hover {
+      background: #5568d3;
+      transform: translateY(-50%) translateX(-2px);
+    }
+
+    &:active {
+      transform: translateY(-50%) translateX(0);
+    }
+  }
+
+  h2 {
+    margin: 0 0 8px 0;
+    font-size: 28px;
+    color: #333;
+  }
+
+  p {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+  }
+
+  &.level-2 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 20%, white 20%);
+    
+    h2, p {
+      color: white;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  &.level-3 {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 20%, white 20%);
+    
+    h2, p {
+      color: white;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
+}
+
+.letter-reference {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 15px;
+
+  h4 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    color: #333;
+    text-align: center;
+  }
+
+  .letter-grid {
+    display: grid;
+    grid-template-columns: repeat(13, 1fr);
+    gap: 8px;
+
+    .letter-pair {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 4px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+
+      .upper {
+        color: #2563eb;
+        font-weight: bold;
+      }
+
+      .separator {
+        margin: 0 3px;
+        color: #999;
+      }
+
+      .lower {
+        color: #10b981;
+        font-weight: bold;
+      }
+    }
+  }
+}
+
+.config-area {
+  width: 320px;
+  flex-shrink: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .level-page {
+    flex-direction: column;
+  }
+
+  .config-area {
+    width: 100%;
+  }
+
+  .game-area {
+    min-height: 70vh;
+  }
+}

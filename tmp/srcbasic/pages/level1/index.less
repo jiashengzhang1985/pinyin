@@ -1,0 +1,72 @@
+.level-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  padding: 20px;
+  display: flex;
+  gap: 20px;
+}
+
+.game-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.level-header {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+
+  h2 {
+    margin: 0 0 8px 0;
+    font-size: 28px;
+    color: #333;
+  }
+
+  p {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+  }
+
+  &.level-2 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 20%, white 20%);
+    
+    h2, p {
+      color: white;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  &.level-3 {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 20%, white 20%);
+    
+    h2, p {
+      color: white;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
+}
+
+.config-area {
+  width: 320px;
+  flex-shrink: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .level-page {
+    flex-direction: column;
+  }
+
+  .config-area {
+    width: 100%;
+  }
+
+  .game-area {
+    min-height: 70vh;
+  }
+}
