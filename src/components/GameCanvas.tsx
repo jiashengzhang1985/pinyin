@@ -358,7 +358,12 @@ export default function GameCanvas({
   const playFourTones = async (txt: string) => {
     for (let tone = 1; tone <= 4; tone++) {
       try {
-        const audio = new Audio(`/mp3/${txt}${tone}.mp3`);
+
+   //    const audio_file = `${window.routerBase || '/'}/mp3/${txt}${tone}.mp3`;
+        const base = (window.routerBase || '/').replace(/\/$/, ''); // 去掉末尾的斜杠
+        const audio_file = `${base}/mp3/${txt}${tone}.mp3`;
+        const audio = new Audio(audio_file);
+   //     const audio = new Audio(`/mp3/${txt}${tone}.mp3`);
         await audio.play();
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (e) {
