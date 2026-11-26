@@ -1,12 +1,12 @@
-import { useState } from 'react';
 import GameCanvas from '@/components/GameCanvas';
 import ConfigPanel from '@/components/ConfigPanel';
 import '../level1/index.less';
+import usePersistedState from '@/utils/usePersistedState';
 
 export default function Level2Page() {
-  const [speed, setSpeed] = useState(3);
-  const [count, setCount] = useState(2);
-  const [pinyinList, setPinyinList] = useState('wo,ni,ta,shi,bo,po,mo,fo');
+  const [speed, setSpeed] = usePersistedState('level2.speed', 3);
+  const [count, setCount] = usePersistedState('level2.count', 2);
+  const [pinyinList, setPinyinList] = usePersistedState('level2.list', 'wo,ni,ta,shi,bo,po,mo,fo');
 
   return (
     <div className="level-page">

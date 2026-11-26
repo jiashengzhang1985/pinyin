@@ -1,13 +1,13 @@
-import { useState } from 'react';
 import { history } from 'umi';
 import GameCanvas from '@/components/GameCanvas';
 import ConfigPanel from '@/components/ConfigPanel';
 import './index.less';
+import usePersistedState from '@/utils/usePersistedState';
 
 export default function Level1Page() {
-  const [speed, setSpeed] = useState(2);
-  const [count, setCount] = useState(1);
-  const [charType, setCharType] = useState<'letter' | 'pinying' | 'mixed'>('mixed');
+  const [speed, setSpeed] = usePersistedState('level1.speed', 2);
+  const [count, setCount] = usePersistedState('level1.count', 1);
+  const [charType, setCharType] = usePersistedState<'letter' | 'pinying' | 'mixed'>('level1.charType', 'mixed');
 
   return (
     <div className="level-page">

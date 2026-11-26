@@ -3,6 +3,7 @@ import { history } from 'umi';
 import GameCanvas from '@/components/GameCanvas';
 import HandwritingCanvas from '@/components/HandwritingCanvas';
 import '../level1/index.less';
+import usePersistedState from '@/utils/usePersistedState';
 
 interface Target {
   id: number;
@@ -15,9 +16,9 @@ interface Target {
 }
 
 export default function Level4Page() {
-  const [speed, setSpeed] = useState(3);
+  const [speed, setSpeed] = usePersistedState('level4.speed', 3);
   const [count, setCount] = useState(1); // 手写模式只能同时1个汉字
-  const [hanziList, setHanziList] = useState('我是中国人爱我中华');
+  const [hanziList, setHanziList] = usePersistedState('level4.list', '我是中国人爱我中华');
   const [targets, setTargets] = useState<Target[]>([]);
   const [currentTarget, setCurrentTarget] = useState<Target | null>(null);
   const [explosions, setExplosions] = useState<{id: number, x: number, y: number}[]>([]);

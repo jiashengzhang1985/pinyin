@@ -1,6 +1,5 @@
 import { history } from 'umi';
 import './index.less';
-
 export default function HomePage() {
   const levels = [
     {
@@ -23,6 +22,13 @@ export default function HomePage() {
       description: '输入拼音击落汉字',
       path: '/level3',
       color: '#FF9800',
+    },
+    {
+      id: 5,
+      title: '第五关：英语单词',
+      description: '打英文单词击落目标，听美音看中文',
+      path: '/level5',
+      color: '#E91E63',
     },
     // {
     //   id: 4,

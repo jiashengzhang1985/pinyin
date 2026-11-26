@@ -94,6 +94,66 @@
       }
     }
 
+    .word-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .word-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+
+      &.add-row {
+        padding-top: 6px;
+        border-top: 1px dashed #e0e0e0;
+      }
+    }
+
+    .word-input {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 8px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+
+      &:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      &:disabled {
+        background: #f5f5f5;
+        color: #888;
+      }
+    }
+
+    .word-input.full {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .word-btn {
+      flex: none;
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 6px;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      color: white;
+
+      &.add { background: #667eea; }
+      &.remove { background: #ef4444; }
+      &:disabled { background: #ccc; cursor: not-allowed; }
+    }
+
     .hint {
       font-size: 12px;
       color: #999;
