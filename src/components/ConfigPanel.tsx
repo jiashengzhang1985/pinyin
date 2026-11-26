@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { parseWord, splitPhrases } from './GameCanvas';
+import { cleanWord } from '@/utils/wordList';
 import type { WordEntry, EnglishMode, HanziMode, HanziUnit } from './GameCanvas';
 import SentenceEditor from './SentenceEditor';
 import usePersistedState from '@/utils/usePersistedState';
@@ -21,8 +22,6 @@ interface ConfigPanelProps {
   onEnglishModeChange?: (mode: EnglishMode) => void;
   wordList?: WordEntry[];
   onWordListChange?: (words: WordEntry[]) => void;
-  focusLetters?: string;
-  onFocusLettersChange?: (focus: string) => void;
   hanziMode?: HanziMode;
   onHanziModeChange?: (mode: HanziMode) => void;
   hanziUnit?: HanziUnit;
@@ -51,8 +50,6 @@ export default function ConfigPanel({
   onEnglishModeChange,
   wordList = [],
   onWordListChange,
-  focusLetters = '',
-  onFocusLettersChange,
   hanziMode = 'see',
   onHanziModeChange,
   hanziUnit = 'char',
@@ -64,14 +61,15 @@ export default function ConfigPanel({
   const [newZh, setNewZh] = useState('');
 
   const addWord = () => {
-    const en = newEn.trim();
+    const en = parseWord(newEn);
     if (!en) return;
     onWordListChange?.([...wordList, { en, zh: newZh.trim() }]);
     setNewEn('');
     setNewZh('');
   };
   const updateWord = (i: number, field: keyof WordEntry, value: string) => {
-    onWordListChange?.(wordList.map((w, idx) => (idx === i ? { ...w, [field]: value } : w)));
+    const v = field === 'en' ? cleanWord(value) : value;
+    onWordListChange?.(wordList.map((w, idx) => (idx === i ? { ...w, [field]: v } : w)));
   };
   const removeWord = (i: number) => {
     onWordListChange?.(wordList.filter((_, idx) => idx !== i));
@@ -291,21 +289,6 @@ export default function ConfigPanel({
         </div>
       )}
 
-      {(level === 3 || level === 5) && (
-        <div className="config-section">
-          <label>{level === 3 ? '拼音高亮' : '本课发音高亮'}</label>
-          <input
-            className="word-input full"
-            value={focusLetters}
-            placeholder={level === 3 ? '如 zh,ch,sh 或 ang,eng' : '如 c，多个用逗号分隔：c,ck'}
-            onChange={(e) => onFocusLettersChange?.(e.target.value)}
-          />
-          <div className="hint">
-            {level === 3 ? '拼音里的这些部分会加蓝底' : '单词里的这些字母会加蓝底'}，留空则不高亮
-          </div>
-        </div>
-      )}
-
       {level === 5 && (
         <div className="config-section">
           <label>单词列表（{wordList.length} 个）</label>
@@ -342,7 +325,7 @@ export default function ConfigPanel({
                   className="word-input"
                   value={newEn}
                   placeholder="英文，如 apple"
-                  onChange={(e) => setNewEn(e.target.value)}
+                  onChange={(e) => setNewEn(cleanWord(e.target.value))}
                   onKeyDown={(e) => e.key === 'Enter' && addWord()}
                 />
                 <input
@@ -367,7 +350,7 @@ export default function ConfigPanel({
         <SentenceEditor
           lang="en"
           disabled={isLocked}
-          words={dedupe(wordList.map(w => ({ word: parseWord(w.en).word.toLowerCase(), hint: w.zh.trim() || undefined })))}
+          words={dedupe(wordList.map(w => ({ word: parseWord(w.en).toLowerCase(), hint: w.zh.trim() || undefined })))}
         />
       )}
 

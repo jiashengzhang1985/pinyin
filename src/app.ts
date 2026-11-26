@@ -1,7 +1,12 @@
-// Umi 运行时入口：只在安卓 App 里生效，网页不受影响
+// Umi 运行时入口
 import { App } from '@capacitor/app';
 import { isNativeApp } from '@/utils/tts';
+import { startBackgroundPrep } from '@/utils/backgroundPrep';
 
+// 网页和 App 都在后台提前生成例句、下载发音
+startBackgroundPrep();
+
+// 以下只在安卓 App 里生效，网页不受影响
 if (isNativeApp) {
   document.documentElement.classList.add('is-native');
 

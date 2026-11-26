@@ -2,23 +2,19 @@ import GameCanvas, { WordEntry, EnglishMode } from '@/components/GameCanvas';
 import ConfigPanel from '@/components/ConfigPanel';
 import usePersistedState from '@/utils/usePersistedState';
 import LevelLayout from '@/components/LevelLayout';
-
-const DEFAULT_WORDS: WordEntry[] = [
-  { en: 'let-tuce', zh: '生菜' },
-  { en: 'ce-re-al', zh: '麦片' },
-  { en: 'cir-cle', zh: '圆圈' },
-  { en: 'ci-ty', zh: '城市' },
-  { en: 'face', zh: '脸' },
-  { en: 'rice', zh: '米饭' },
-  { en: 'pen-cil', zh: '铅笔' },
-];
+import { useEffect } from 'react';
+import { DEFAULT_WORDS, cleanWord } from '@/utils/wordList';
 
 export default function Level5Page() {
   const [speed, setSpeed] = usePersistedState('level5.speed', 2);
   const [count, setCount] = usePersistedState('level5.count', 1);
   const [mode, setMode] = usePersistedState<EnglishMode>('level5.mode', 'en');
   const [words, setWords] = usePersistedState<WordEntry[]>('level5.words', DEFAULT_WORDS);
-  const [focus, setFocus] = usePersistedState('level5.focus', 'c');
+
+  // 以前保存的词表里可能有“let-tuce”这种拆音节写法，去掉“-”
+  useEffect(() => {
+    if (words.some(w => w.en.includes('-'))) setWords(words.map(w => ({ ...w, en: cleanWord(w.en) })));
+  }, []);
 
   return (
     <LevelLayout
@@ -29,7 +25,6 @@ export default function Level5Page() {
           maxCount={count}
           wordList={words}
           englishMode={mode}
-          focusLetters={focus}
         />
       }
       config={
@@ -43,8 +38,6 @@ export default function Level5Page() {
           onEnglishModeChange={setMode}
           wordList={words}
           onWordListChange={setWords}
-          focusLetters={focus}
-          onFocusLettersChange={setFocus}
         />
       }
     />

@@ -7,6 +7,7 @@
 //   智谱 Key：  https://open.bigmodel.cn （注册后在“API Keys”里创建，GLM-4.5-Flash 等 Flash 模型免费）
 import { useEffect, useState } from 'react';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { prepareEnglishAudio } from './tts';
 
 // Key 不进 Git（仓库公开会被自动停用）：本地放在 .env.local，Netlify 在环境变量里配置
 const GEMINI_API_KEY: string = process.env.GEMINI_API_KEY || '';
@@ -216,9 +217,14 @@ const load = (lang: SentenceLang, word: string, hint?: string): Promise<Sentence
   return p;
 };
 
-// 目标刚出现、或在配置里录入新词时调用，提前在后台准备例句
+// 录入新词、App 启动、目标出现时调用，在后台提前准备好例句；
+// 英文还会把单词和每个例句的发音下载到手机里（App），玩的时候不用临时联网
 export const prefetchSentence = (lang: SentenceLang, word: string, hint?: string) => {
-  if (word.trim()) load(lang, word, hint);
+  if (!word.trim()) return;
+  if (lang === 'en') prepareEnglishAudio(word);
+  load(lang, word, hint).then(list => {
+    if (lang === 'en') list?.forEach(s => prepareEnglishAudio(s.text));
+  });
 };
 
 // 取一句例句（多句轮流使用）；最多等 timeoutMs，超时或没有例句时返回 null
@@ -242,7 +248,9 @@ export const getSentence = async (
 
 // 配置面板手工修改：一行一句，英文行用 “句子 | 中文翻译”；清空表示这个词不读例句
 export const saveSentencesText = (lang: SentenceLang, word: string, hint: string | undefined, text: string) => {
-  writeCache(cacheKey(lang, word, hint), parseLines(lang, text));
+  const list = parseLines(lang, text);
+  writeCache(cacheKey(lang, word, hint), list);
+  if (lang === 'en') list.forEach(s => prepareEnglishAudio(s.text));
 };
 
 // 丢掉现有例句，让 AI 重新生成
@@ -251,7 +259,7 @@ export const regenerateSentences = (lang: SentenceLang, word: string, hint?: str
   if (inflight.has(key)) return;
   memory.delete(key);
   try { localStorage.removeItem(key); } catch {}
-  load(lang, word, hint);
+  prefetchSentence(lang, word, hint);
 };
 
 export const sentenceState = (lang: SentenceLang, word: string, hint?: string): { status: SentenceStatus; list: Sentence[] } => {

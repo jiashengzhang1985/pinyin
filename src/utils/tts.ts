@@ -1,9 +1,12 @@
 // 统一的朗读入口：
+// - 英文优先用有道美式真人发音（提前加载 / App 里提前下载），不行再用系统语音
 // - 安卓 App 里用系统原生 TTS（WebView 的 speechSynthesis 在很多手机上没声音）
-// - 网页里照旧用浏览器的 speechSynthesis
+// - 网页里用浏览器的 speechSynthesis
 // 所有朗读都返回 Promise，读完（或失败、超时）后 resolve。
 import { Capacitor } from '@capacitor/core';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
+import { cacheAudio, cachedAudioUrl } from './audioCache';
+import { loadClip, playClipBuffer } from './clipPlayer';
 
 export const isNativeApp = Capacitor.isNativePlatform();
 
@@ -77,10 +80,9 @@ const pickNativeVoice = async (lang: TtsLang): Promise<number | undefined> => {
   return i >= 0 ? i : undefined;
 };
 
-// 播放一个网络音频，播完返回 true；失败或超时返回 false
-const playRemote = (url: string, timeoutMs: number) =>
+// 播放一个音频元素，播完返回 true；失败或超时没开始返回 false
+const playElement = (audio: HTMLAudioElement, timeoutMs: number) =>
   new Promise<boolean>(resolve => {
-    const audio = new Audio(url);
     let started = false;
     const fail = setTimeout(() => { if (!started) { audio.src = ''; resolve(false); } }, timeoutMs);
     audio.onplaying = () => { started = true; clearTimeout(fail); };
@@ -89,12 +91,79 @@ const playRemote = (url: string, timeoutMs: number) =>
     audio.play().catch(() => { clearTimeout(fail); resolve(false); });
   });
 
-// 英文在 App 里先用有道词典的美式发音（单词是真人录音，国内也能访问），联网失败再用手机 TTS
-const speakEnglishOnline = (text: string) =>
-  playRemote(`https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=2`, 4000);
+// 英文用有道词典的美式发音（单词是真人录音，国内外都能访问），网页和 App 都一样：
+// - App 里配置时已在后台下载到手机里的，直接播放本地文件
+// - 目标出现时就预先加载好，击中后立即出声，不用等联网
+// - 有道连不上时 5 分钟内不再尝试，直接用系统语音，免得每次都等
+const youdaoUrl = (text: string) => {
+  const t = text.trim().replace(/\s+/g, ' ');
+  return `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(t.includes(' ') ? t : t.toLowerCase())}&type=2`;
+};
+let youdaoDownUntil = 0;
+const youdaoDown = () => Date.now() < youdaoDownUntil;
+
+// 已准备好的英文发音：
+// - App：下载到手机里并解码到内存的本地文件地址（播放无需联网、无需等待）
+// - 网页：预先加载好的 <audio>（有道不允许网页直接读取数据，只能这样预加载）
+const readyLocal = new Map<string, string>();
+const readyWeb = new Map<string, HTMLAudioElement>();
+const preparing = new Map<string, Promise<void>>();
+
+/**
+ * 提前准备好一段英文的发音。配置好单词、生成好例句后就在后台调用，
+ * 玩的时候直接播放。重复调用只准备一次。
+ */
+export const prepareEnglishAudio = (text: string): Promise<void> => {
+  if (!text.trim()) return Promise.resolve();
+  const url = youdaoUrl(text);
+  let p = preparing.get(url);
+  if (!p) {
+    p = (async () => {
+      if (isNativeApp) {
+        await cacheAudio(url);
+        const local = await cachedAudioUrl(url);
+        if (local) {
+          await loadClip(local);
+          readyLocal.set(url, local);
+        }
+      } else {
+        const audio = new Audio();
+        audio.preload = 'auto';
+        audio.src = url;
+        audio.load();
+        readyWeb.set(url, audio);
+      }
+    })();
+    // 没准备成功的（断网等），下次再调用时重试
+    p.then(() => { if (!readyLocal.has(url) && !readyWeb.has(url)) preparing.delete(url); });
+    preparing.set(url, p);
+  }
+  return p;
+};
+export const preloadEnglish = prepareEnglishAudio;
+
+const speakEnglishAudio = async (text: string) => {
+  const url = youdaoUrl(text);
+  // App：已下载的本地发音
+  const local = readyLocal.get(url) || (isNativeApp ? await cachedAudioUrl(url) : null);
+  if (local && (await playClipBuffer(local))) return true;
+  // 网页：预先加载好的，可反复播放
+  const web = readyWeb.get(url);
+  if (web) {
+    web.currentTime = 0;
+    if (await playElement(web, 3000)) return true;
+    readyWeb.delete(url);
+    preparing.delete(url);
+  }
+  // 都没有（刚录入还没准备好）：临时联网播放，同时准备下次用
+  if (youdaoDown()) return false;
+  prepareEnglishAudio(text);
+  const ok = await playElement(new Audio(url), 4000);
+  if (!ok) youdaoDownUntil = Date.now() + 5 * 60_000;
+  return ok;
+};
 
 const speakNative = async (text: string, lang: TtsLang, rate: number) => {
-  if (lang === 'en-US' && (await speakEnglishOnline(text))) return;
   const voice = await pickNativeVoice(lang);
   // 安卓 TTS 的 1.0 比浏览器略快，整体放慢一点更适合孩子
   const timeout = new Promise<void>(r => setTimeout(r, 5000 + text.length * 600));
@@ -109,6 +178,7 @@ export const speak = async (text: string, lang: TtsLang = 'zh-CN', rate = 0.9) =
   if (!text.trim()) return;
   speakingCount++;
   try {
+    if (lang === 'en-US' && (await speakEnglishAudio(text))) return;
     if (isNativeApp) await speakNative(text, lang, rate);
     else await speakWeb(text, lang, rate);
   } finally {

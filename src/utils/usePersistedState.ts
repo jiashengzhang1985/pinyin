@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import { configChanged } from './backgroundPrep';
+
+// 这些配置一改，就在后台提前准备声音和例句
+const PREP_KEYS = new Set(['level3.list', 'level3.phraseList', 'level5.words']);
 
 const PREFIX = 'typing-game:';
 
@@ -29,6 +33,7 @@ export default function usePersistedState<T>(key: string, defaultValue: T) {
     } catch {
       // 隐私模式或存储被禁用时忽略
     }
+    if (PREP_KEYS.has(key)) configChanged();
   }, [key, value]);
 
   return [value, setValue] as const;
