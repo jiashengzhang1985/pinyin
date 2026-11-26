@@ -136,3 +136,36 @@
     }
   }
 }
+
+/* 横屏手机这类矮屏幕：标题缩小，卡片排成一行 */
+@media (max-height: 500px) {
+  .home-page {
+    padding: 16px 20px;
+  }
+
+  .game-title {
+    margin-bottom: 28px;
+
+    h1 {
+      font-size: 32px;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      margin-top: 4px;
+    }
+  }
+
+  .level-cards {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    margin-bottom: 24px;
+  }
+
+  .level-card {
+    padding: 22px 18px 18px;
+
+    h2 {
+      margin: 12px 0 6px 0;
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import GameCanvas, { WordEntry, EnglishMode } from '@/components/GameCanvas';
 import ConfigPanel from '@/components/ConfigPanel';
 import usePersistedState from '@/utils/usePersistedState';
-import '../level1/index.less';
+import LevelLayout from '@/components/LevelLayout';
 
 const DEFAULT_WORDS: WordEntry[] = [
   { en: 'let-tuce', zh: '生菜' },
@@ -21,8 +21,8 @@ export default function Level5Page() {
   const [focus, setFocus] = usePersistedState('level5.focus', 'c');
 
   return (
-    <div className="level-page">
-      <div className="game-area">
+    <LevelLayout
+      game={
         <GameCanvas
           level={5}
           speed={speed}
@@ -31,8 +31,8 @@ export default function Level5Page() {
           englishMode={mode}
           focusLetters={focus}
         />
-      </div>
-      <div className="config-area">
+      }
+      config={
         <ConfigPanel
           level={5}
           speed={speed}
@@ -46,7 +46,7 @@ export default function Level5Page() {
           focusLetters={focus}
           onFocusLettersChange={setFocus}
         />
-      </div>
-    </div>
+      }
+    />
   );
 }

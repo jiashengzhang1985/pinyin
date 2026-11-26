@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { pinyin } from 'pinyin-pro';
 import usePersistedState from '@/utils/usePersistedState';
 import { prefetchSentence, getSentence, SentenceLang } from '@/utils/exampleSentence';
+import { speak, isSpeaking } from '@/utils/tts';
+import VirtualKeyboard, { useShowVirtualKeyboard } from './VirtualKeyboard';
 import './GameCanvas.less';
 
 interface Target {
@@ -188,21 +190,6 @@ const ZH_ROUND_CLIPS: Record<number, string[]> = {
 };
 const pickOne = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
-// macOS 上这批中文语音机械感很重，浏览器语音回退时避开
-const ROBOTIC_VOICES = /Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley/i;
-const pickZhVoice = (): SpeechSynthesisVoice | undefined => {
-  if (!window.speechSynthesis) return undefined;
-  const zh = window.speechSynthesis
-    .getVoices()
-    .filter(v => /^zh[-_]CN/i.test(v.lang) && !ROBOTIC_VOICES.test(v.name));
-  return (
-    zh.find(v => /Natural|Online/i.test(v.name)) || // Edge 的神经网络语音，最自然
-    zh.find(v => /Google/i.test(v.name)) ||
-    zh.find(v => /Tingting|婷婷/i.test(v.name)) ||
-    zh[0]
-  );
-};
-
 const assetBase = () => (((window as any).routerBase as string) || '/').replace(/\/$/, '');
 
 // 播放一个音频文件，播完（或失败）后返回是否成功
@@ -215,19 +202,8 @@ const playUrl = (url: string) =>
     audio.play().catch(() => { clearTimeout(timer); resolve(false); });
   });
 
-// 用浏览器语音读中文，读完后返回
-const speakZhAndWait = (text: string) =>
-  new Promise<void>(resolve => {
-    if (!window.speechSynthesis) return resolve();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-CN';
-    u.rate = 0.9;
-    const v = pickZhVoice();
-    if (v) u.voice = v;
-    const timer = setTimeout(resolve, 3000 + text.length * 500);
-    u.onend = u.onerror = () => { clearTimeout(timer); resolve(); };
-    window.speechSynthesis.speak(u);
-  });
+// 用系统语音读中文，读完后返回（App 里走原生 TTS）
+const speakZhAndWait = (text: string) => speak(text, 'zh-CN', 0.9);
 
 // 拼音音节对应的录音文件名：ü 写作 uu，轻声优先用 5 声录音，没有就用 1 声
 const syllableFiles = (syllable: string, tone: number) => {
@@ -269,6 +245,7 @@ export default function GameCanvas({
   hanziUnit = 'char',
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const touchKeyboard = useShowVirtualKeyboard();
   const [targets, setTargets] = useState<Target[]>([]);
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [particles, setParticles] = useState<Particle[]>([]);
@@ -575,53 +552,12 @@ export default function GameCanvas({
     // };
     console.log('Playing pinyin sound for:', char);
     const name = pinyingMap[char];
-    if (name) {
-      const utterance = new SpeechSynthesisUtterance(name);
-      utterance.lang = 'zh-CN';
-      const zhVoice = pickZhVoice();
-      if (zhVoice) utterance.voice = zhVoice;
-      utterance.rate = 0.8;
-      window.speechSynthesis.speak(utterance);
-
-    }
+    if (name) speak(name, 'zh-CN', 0.8);
   }
   // 美式英语发音
-  const speakEnglish = (text: string, rate = 0.85) => new Promise<void>(resolve => {
-    if (!window.speechSynthesis) return resolve();
-    const utterance = new SpeechSynthesisUtterance(text);
-    const timer = setTimeout(resolve, 3000 + text.length * 250);
-    utterance.onend = utterance.onerror = () => { clearTimeout(timer); resolve(); };
-    utterance.lang = 'en-US';
-    utterance.rate = rate;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    const speakWithVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      // 按优先级选择最好的英语语音
-      const bestVoice =
-        voices.find(v => v.name.includes('Google US English')) ||
-        voices.find(v => v.lang === 'en-US' && v.name.includes('Female')) ||
-        voices.find(v => v.lang === 'en-US' && v.localService) ||
-        voices.find(v => v.lang === 'en-US') ||
-        voices.find(v => v.lang.startsWith('en'));
-      if (bestVoice) utterance.voice = bestVoice;
-      window.speechSynthesis.speak(utterance);
-    };
-
-    // 某些浏览器需要等待语音列表加载
-    if (window.speechSynthesis.getVoices().length > 0) {
-      speakWithVoice();
-    } else {
-      window.speechSynthesis.onvoiceschanged = () => {
-        speakWithVoice();
-        window.speechSynthesis.onvoiceschanged = null;
-      };
-    }
-  });
+  const speakEnglish = (text: string, rate = 0.85) => speak(text, 'en-US', rate);
 
   const playLevel1Sound = (char: string) => {
-    if (!window.speechSynthesis) return;
     
   //  const isUpperCase = /[A-Z]/.test(char);
    // const isLetter = /[a-zA-Z]/.test(char);
@@ -660,14 +596,7 @@ export default function GameCanvas({
         '5': '五', '6': '六', '7': '七', '8': '八', '9': '九',
       };
       const chinese = numberToChinese[char];
-      if (chinese) {
-        const utterance = new SpeechSynthesisUtterance(chinese);
-        utterance.lang = 'zh-CN';
-        const zhVoice = pickZhVoice();
-        if (zhVoice) utterance.voice = zhVoice;
-        utterance.rate = 0.85;
-        window.speechSynthesis.speak(utterance);
-      }
+      if (chinese) speak(chinese, 'zh-CN', 0.85);
     }
   };
 
@@ -1121,7 +1050,7 @@ export default function GameCanvas({
       if (isListen) {
         ctx.font = '16px sans-serif';
         ctx.fillStyle = '#94a3b8';
-        ctx.fillText('按空格再听一遍', 16, canvas.height - 30);
+        ctx.fillText(touchKeyboard ? '点 🔊 再听一遍' : '按空格再听一遍', 16, canvas.height - 30);
       }
       // 连击鼓励
       if (banner) {
@@ -1179,11 +1108,8 @@ export default function GameCanvas({
     if (st.hits >= roundSize) finishRound();
   };
 
-  // 第五关击中：先按音节慢读（如果有拆分），再正常读一遍
-  const sayWord = async (word: string, syllables?: string[]) => {
-    if (syllables) for (const sy of syllables) await speakEnglish(sy, 0.6);
-    await speakEnglish(word);
-  };
+  // 第五关击中：正常读一遍单词
+  const sayWord = (word: string) => speakEnglish(word);
 
   // 一轮结束：不暂停游戏，只在屏幕中间飘过星级并累计星星，然后直接开始下一轮
   const finishRound = () => {
@@ -1294,7 +1220,7 @@ export default function GameCanvas({
               const word = englishMode === 'zh' ? (tg.answer || '') : tg.text;
               const syllables = tg.syllables;
               sayWithExample(
-                () => sayWord(word, syllables),
+                () => sayWord(word),
                 { lang: 'en', word: tg.answer || word.toLowerCase(), hint: tg.translation },
               );
               const px = Math.min(Math.max(b.targetX, 120), canvas.width - 120);
@@ -1305,8 +1231,7 @@ export default function GameCanvas({
                 en: word,
                 zh: tg.translation || '',
                 life: 1,
-                // 有音节慢读时停留久一点，等读完
-                decay: syllables ? 1 / 60 : 1 / 24,
+                decay: 1 / 24,
                 syllables,
               }]);
               recordHit();
@@ -1571,7 +1496,7 @@ export default function GameCanvas({
     targets.forEach(t => {
       const key = `${t.id}:${t.round || 0}`;
       // 只读听写模式下创建的目标；等前面的发音（如上一个词的击中发音）读完再读
-      if (t.mode === 'listen' && !announcedRef.current.has(key) && !window.speechSynthesis?.speaking && audioBusyRef.current === 0) {
+      if (t.mode === 'listen' && !announcedRef.current.has(key) && !isSpeaking() && audioBusyRef.current === 0) {
         announcedRef.current.add(key);
         speakTarget(t);
       }
@@ -1581,9 +1506,9 @@ export default function GameCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const c = canvas.parentElement;
     const resize = () => {
-      const c = canvas.parentElement;
-      if (c) {
+      if (c && (canvas.width !== c.clientWidth || canvas.height !== c.clientHeight)) {
         canvas.width = c.clientWidth;
         canvas.height = c.clientHeight;
         spaceshipXRef.current = canvas.width / 2;
@@ -1591,7 +1516,13 @@ export default function GameCanvas({
     };
     resize();
     window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
+    // 屏幕键盘、横竖屏切换都会改变画布容器大小
+    const ro = typeof ResizeObserver !== 'undefined' && c ? new ResizeObserver(resize) : null;
+    if (ro && c) ro.observe(c);
+    return () => {
+      window.removeEventListener('resize', resize);
+      ro?.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -1628,9 +1559,28 @@ export default function GameCanvas({
     nextIdRef.current = 0;
   }, [charType, speed, maxCount, customList, wordKey, englishMode, hanziMode, hanziUnit]);
 
+  // 屏幕键盘：按键直接交给键盘处理函数；“再读”读锁定的目标，没有就读最下面的那个
+  const showKeyboard = touchKeyboard && !handwritingMode && (level === 3 || level === 5);
+  const onVirtualKey = (key: string) =>
+    handleKeyPress({ key, target: null, ctrlKey: false, metaKey: false, altKey: false, preventDefault() {} } as unknown as KeyboardEvent);
+  const replay = () => {
+    const tg = targets.find(t => t.id === currentTargetId) || [...targets].sort((a, b) => b.y - a.y)[0];
+    if (tg) speakTarget(tg);
+  };
+
   return (
-    <div className="game-canvas-container">
-      <canvas ref={canvasRef} className="game-canvas" />
+    <div className={`game-canvas-wrap${showKeyboard ? ' with-keyboard' : ''}`}>
+      <div className="game-canvas-container">
+        <canvas ref={canvasRef} className="game-canvas" />
+      </div>
+      {showKeyboard && (
+        <VirtualKeyboard
+          onKey={onVirtualKey}
+          onReplay={replay}
+          pinyinMode={level === 3}
+          withSpace={level === 5 && validWords.some(w => w.en.includes(' '))}
+        />
+      )}
     </div>
   );
 }

@@ -44,3 +44,18 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* 安卓 App 里：不允许长按选字、不要页面回弹 */
+html.is-native,
+html.is-native body {
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  background: #1e3c72;
+}
+html.is-native textarea,
+html.is-native input {
+  -webkit-user-select: text;
+  user-select: text;
+}

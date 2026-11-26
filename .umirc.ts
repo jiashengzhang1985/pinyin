@@ -26,8 +26,9 @@ export default defineConfig({
     { path: "/*", redirect: "/" },
   ],
   npmClient: 'npm',
-  // 构建时注入 Gemini Key（来自 .env.local 或 Netlify 环境变量），不写进仓库
+  // 构建时注入 Gemini / 智谱 Key（来自 .env.local 或 Netlify 环境变量），不写进仓库
   define: {
     'process.env.GEMINI_API_KEY': process.env.GEMINI_API_KEY || '',
+    'process.env.ZHIPU_API_KEY': process.env.ZHIPU_API_KEY || '',
   },
 });

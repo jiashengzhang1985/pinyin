@@ -1,6 +1,6 @@
 import GameCanvas, { HanziMode, HanziUnit } from '@/components/GameCanvas';
 import ConfigPanel from '@/components/ConfigPanel';
-import '../level1/index.less';
+import LevelLayout from '@/components/LevelLayout';
 import usePersistedState from '@/utils/usePersistedState';
 
 export default function Level3Page() {
@@ -18,8 +18,8 @@ export default function Level3Page() {
   const setList = unit === 'phrase' ? setPhraseList : setHanziList;
 
   return (
-    <div className="level-page">
-      <div className="game-area">
+    <LevelLayout
+      game={
         <GameCanvas
           level={3}
           speed={speed}
@@ -30,8 +30,8 @@ export default function Level3Page() {
           hanziUnit={unit}
           focusLetters={focus}
         />
-      </div>
-      <div className="config-area">
+      }
+      config={
         <ConfigPanel
           level={3}
           speed={speed}
@@ -49,7 +49,7 @@ export default function Level3Page() {
           focusLetters={focus}
           onFocusLettersChange={setFocus}
         />
-      </div>
-    </div>
+      }
+    />
   );
 }

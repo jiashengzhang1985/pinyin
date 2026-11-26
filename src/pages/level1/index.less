@@ -151,3 +151,86 @@
     min-height: 70vh;
   }
 }
+
+/* 触屏紧凑布局：游戏 + 屏幕键盘占满整屏，设置收进抽屉 */
+.level-page.compact {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  flex-direction: row;
+  padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right))
+    max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  gap: 0;
+  overflow: hidden;
+
+  .game-area {
+    position: relative;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .compact-toolbar {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    display: flex;
+    gap: 8px;
+
+    button {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      font-size: 22px;
+      line-height: 44px;
+      padding: 0;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+
+  .config-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 20;
+  }
+
+  .config-area {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(400px, 92vw);
+    z-index: 21;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: #f4f6fb;
+    padding: 10px;
+    box-sizing: border-box;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    box-shadow: -6px 0 24px rgba(0, 0, 0, 0.3);
+
+    .config-panel {
+      max-height: none;
+    }
+  }
+
+  &.config-open .config-area {
+    transform: none;
+  }
+
+  .config-close {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: #667eea;
+    color: #fff;
+    font-size: 16px;
+  }
+}

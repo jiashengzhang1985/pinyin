@@ -1,4 +1,5 @@
 import { history } from 'umi';
+import { isNativeApp } from '@/utils/tts';
 import './index.less';
 export default function HomePage() {
   const levels = [
@@ -24,20 +25,16 @@ export default function HomePage() {
       color: '#FF9800',
     },
     {
-      id: 5,
-      title: '第五关：英语单词',
+      id: 4,
+      title: '第四关：英语单词',
       description: '打英文单词击落目标，听美音看中文',
       path: '/level5',
       color: '#E91E63',
     },
-    // {
-    //   id: 4,
-    //   title: '第四关：手写挑战',
-    //   description: '手写汉字击落目标',
-    //   path: '/level4',
-    //   color: '#9C27B0',
-    // },
   ];
+
+  // 安卓 App 只要第三关和第四关（英语单词）
+  const shown = isNativeApp ? levels.filter(l => l.id === 3 || l.id === 4) : levels;
 
   return (
     <div className="home-page">
@@ -47,7 +44,7 @@ export default function HomePage() {
       </div>
 
       <div className="level-cards">
-        {levels.map((level) => (
+        {shown.map((level) => (
           <div
             key={level.id}
             className="level-card"
@@ -69,15 +66,17 @@ export default function HomePage() {
         ))}
       </div>
 
-      <div className="game-instructions">
-        <h3>游戏说明</h3>
-        <ul>
-          <li>🎯 通过键盘输入正确的字符来击落目标</li>
-          <li>⚡ 可以在右侧调整掉落速度和数量</li>
-          <li>🔄 掉落到底部未击中会重新从顶部掉落</li>
-          <li>🎮 多个目标时，自动匹配最接近的目标</li>
-        </ul>
-      </div>
+      {!isNativeApp && (
+        <div className="game-instructions">
+          <h3>游戏说明</h3>
+          <ul>
+            <li>🎯 通过键盘输入正确的字符来击落目标</li>
+            <li>⚡ 可以在右侧调整掉落速度和数量</li>
+            <li>🔄 掉落到底部未击中会重新从顶部掉落</li>
+            <li>🎮 多个目标时，自动匹配最接近的目标</li>
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

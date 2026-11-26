@@ -7,9 +7,15 @@
     "postinstall": "umi setup",
     "setup": "umi setup",
     "start": "npm run dev",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "build:app": "umi build && cap sync android",
+    "apk": "bash scripts/build-apk.sh"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "^8.0.2",
+    "@capacitor/android": "^8.6.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.3",
     "hanzi-writer": "^3.7.3",
     "pinyin-pro": "^3.28.0",
     "react": "^18.2.0",
@@ -17,6 +23,7 @@
     "umi": "^4.6.24"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.3",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "gh-pages": "^6.3.0",

@@ -8,3 +8,6 @@
 /dist
 .swc
 .turbopack
+
+# 安卓安装包
+/pinyin-shooter.apk

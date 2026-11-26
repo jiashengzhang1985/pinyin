@@ -1,13 +1,19 @@
 // 击中词组/单词后读一句带这个词的例句。
-// 例句由 Google Gemini 免费 API 生成，结果保存在浏览器里，同一个词只请求一次；
+// 例句由免费的大模型 API 生成，结果保存在本机，同一个词只请求一次；
 // 在配置面板里可以查看、手工修改或重新生成。
-// Key 在 https://aistudio.google.com/apikey 免费申请；没有 Key 时不读例句。
+// 两家服务：国外用 Google Gemini，国内用智谱 GLM（Gemini 在国内连不上）。
+// 按设备时区判断先用哪家，失败了再换另一家；两个 Key 都没有时不读例句。
+//   Gemini Key：https://aistudio.google.com/apikey
+//   智谱 Key：  https://open.bigmodel.cn （注册后在“API Keys”里创建，GLM-4.5-Flash 等 Flash 模型免费）
 import { useEffect, useState } from 'react';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
-// Key 不进 Git（仓库公开会被 Google 自动停用）：本地放在 .env.local，Netlify 在环境变量里配置 GEMINI_API_KEY
+// Key 不进 Git（仓库公开会被自动停用）：本地放在 .env.local，Netlify 在环境变量里配置
 const GEMINI_API_KEY: string = process.env.GEMINI_API_KEY || '';
+const ZHIPU_API_KEY: string = process.env.ZHIPU_API_KEY || '';
 // 轻量模型够用且快；第一个失败（繁忙/下线）时依次换下一个
 const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+const ZHIPU_MODELS = ['glm-4.5-flash', 'glm-4-flash-250414', 'glm-4-flash'];
 
 export type SentenceLang = 'en' | 'zh';
 
@@ -28,7 +34,6 @@ const memory = new Map<string, Sentence[]>();
 const inflight = new Map<string, Promise<Sentence[] | null>>();
 const failed = new Set<string>();
 const turn = new Map<string, number>();
-let coolDownUntil = 0; // 被限流后暂停一会儿再请求
 
 // 例句变化时通知配置面板刷新
 const listeners = new Set<() => void>();
@@ -96,32 +101,95 @@ const serial = <T,>(task: () => Promise<T>): Promise<T> => {
   return p;
 };
 
-const request = (lang: SentenceLang, word: string, hint?: string) => serial(async (): Promise<Sentence[] | null> => {
-  if (!GEMINI_API_KEY) return null;
-  if (Date.now() < coolDownUntil) await new Promise(r => setTimeout(r, coolDownUntil - Date.now()));
-  const lw = word.toLowerCase();
+// 设备时区在中国大陆时先用国内服务
+const inChina = (() => {
+  try {
+    return /^Asia\/(Shanghai|Chongqing|Chungking|Harbin|Urumqi|Kashgar)$/.test(
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
+  } catch {
+    return false;
+  }
+})();
+
+type Provider = 'gemini' | 'zhipu';
+const coolDown: Record<Provider, number> = { gemini: 0, zhipu: 0 }; // 被限流后暂停一会儿
+
+// 发 POST 请求：App 里走原生网络（没有浏览器跨域限制），网页里用 fetch；超时算失败
+const postJson = async (url: string, headers: Record<string, string>, body: unknown, timeoutMs = 10000) => {
+  const allHeaders = { 'Content-Type': 'application/json', ...headers };
+  if (Capacitor.isNativePlatform()) {
+    const res = await CapacitorHttp.post({
+      url,
+      headers: allHeaders,
+      data: body,
+      connectTimeout: timeoutMs,
+      readTimeout: timeoutMs * 2,
+    });
+    const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+    return { status: res.status, data };
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs * 2);
+  try {
+    const res = await fetch(url, { method: 'POST', headers: allHeaders, body: JSON.stringify(body), signal: ctrl.signal });
+    return { status: res.status, data: res.ok ? await res.json() : null };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+// 调一家服务，返回模型输出的文字；失败返回 null
+const askGemini = async (prompt: string): Promise<string | null> => {
   for (const model of GEMINI_MODELS) {
+    const { status, data } = await postJson(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      { 'x-goog-api-key': GEMINI_API_KEY },
+      { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.9 } },
+    );
+    if (status === 429) { coolDown.gemini = Date.now() + 30_000; return null; }
+    if (status < 200 || status >= 300) continue;
+    const text: string = (data?.candidates?.[0]?.content?.parts || [])
+      .map((p: any) => (p.thought ? '' : p.text || ''))
+      .join('');
+    if (text) return text;
+  }
+  return null;
+};
+
+const askZhipu = async (prompt: string): Promise<string | null> => {
+  for (const model of ZHIPU_MODELS) {
+    const { status, data } = await postJson(
+      'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+      { Authorization: `Bearer ${ZHIPU_API_KEY}` },
+      {
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.9,
+        thinking: { type: 'disabled' }, // 不需要深度思考，关掉更快
+      },
+    );
+    if (status === 429) { coolDown.zhipu = Date.now() + 30_000; return null; }
+    if (status < 200 || status >= 300) continue;
+    const text: string = data?.choices?.[0]?.message?.content || '';
+    if (text) return text;
+  }
+  return null;
+};
+
+const providers = (): Provider[] => {
+  const order: Provider[] = inChina ? ['zhipu', 'gemini'] : ['gemini', 'zhipu'];
+  return order.filter(p => (p === 'gemini' ? GEMINI_API_KEY : ZHIPU_API_KEY));
+};
+
+const request = (lang: SentenceLang, word: string, hint?: string) => serial(async (): Promise<Sentence[] | null> => {
+  const lw = word.toLowerCase();
+  const prompt = buildPrompt(lang, word, hint);
+  for (const p of providers()) {
+    if (Date.now() < coolDown[p]) continue;
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: buildPrompt(lang, word, hint) }] }],
-            generationConfig: { temperature: 0.9 },
-          }),
-        },
-      );
-      if (res.status === 429) {
-        coolDownUntil = Date.now() + 30_000;
-        return null;
-      }
-      if (!res.ok) continue;
-      const data = await res.json();
-      const text: string = (data?.candidates?.[0]?.content?.parts || [])
-        .map((p: any) => (p.thought ? '' : p.text || ''))
-        .join('');
+      const text = p === 'gemini' ? await askGemini(prompt) : await askZhipu(prompt);
+      if (!text) continue;
       const list = parseLines(lang, text).filter(s => s.text.toLowerCase().includes(lw)).slice(0, 3);
       if (list.length) return list;
     } catch {}
