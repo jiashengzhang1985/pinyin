@@ -27,7 +27,7 @@ export default function SentenceEditor({ lang, words, disabled }: Props) {
       </div>
       <div className="sentence-list">
         {words.map(w => (
-          <SentenceRow key={w.word} lang={lang} word={w.word} hint={w.hint} disabled={disabled} />
+          <SentenceRow key={`${w.word}|${w.hint || ''}`} lang={lang} word={w.word} hint={w.hint} disabled={disabled} />
         ))}
       </div>
     </div>
@@ -35,7 +35,7 @@ export default function SentenceEditor({ lang, words, disabled }: Props) {
 }
 
 function SentenceRow({ lang, word, hint, disabled }: { lang: SentenceLang; word: string; hint?: string; disabled?: boolean }) {
-  const { status, list } = sentenceState(lang, word);
+  const { status, list } = sentenceState(lang, word, hint);
   const saved = sentencesToText(list);
   const [text, setText] = useState(saved);
   const [editing, setEditing] = useState(false);
@@ -47,7 +47,7 @@ function SentenceRow({ lang, word, hint, disabled }: { lang: SentenceLang; word:
 
   const save = () => {
     setEditing(false);
-    if (text.trim() !== saved.trim()) saveSentencesText(lang, word, text);
+    if (text.trim() !== saved.trim()) saveSentencesText(lang, word, hint, text);
   };
 
   return (

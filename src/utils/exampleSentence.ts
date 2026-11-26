@@ -19,7 +19,9 @@ export interface Sentence {
 export type SentenceStatus = 'ready' | 'loading' | 'failed' | 'none';
 
 const CACHE_PREFIX = 'sentence.v2.'; // 改提示词后升版本，旧缓存作废
-const cacheKey = (lang: SentenceLang, word: string) => `${CACHE_PREFIX}${lang}.${word.trim().toLowerCase()}`;
+// 英文单词连同中文意思一起作为缓存键：改了中文意思（比如一行从“pencil 铅笔”改成“how 怎么”）就会重新生成
+const cacheKey = (lang: SentenceLang, word: string, hint?: string) =>
+  `${CACHE_PREFIX}${lang}.${word.trim().toLowerCase()}${hint?.trim() ? `|${hint.trim()}` : ''}`;
 
 // 保存的列表可以为空数组：表示家长把例句全删了，这个词不读例句，也不再自动生成
 const memory = new Map<string, Sentence[]>();
@@ -57,7 +59,8 @@ const writeCache = (key: string, list: Sentence[]) => {
 const buildPrompt = (lang: SentenceLang, word: string, hint?: string) =>
   lang === 'en'
     ? `Write 3 different, simple English sentences for a 7-year-old child who grew up in China and is learning English as a foreign language (beginner level, like a primary-school English textbook in China).
-Each sentence must contain the word "${word}"${hint ? ` (meaning: ${hint})` : ''}.
+Each sentence must contain the word "${word}", used with its real, common English meaning.${hint ? `
+The Chinese meaning "${hint}" is only a hint; if it does not match "${word}", ignore it and follow the English word.` : ''}
 Rules: at most 10 words per sentence. Use common, easy words a young beginner knows (family, colors, animals, food, school, play).
 Simple grammar, mostly present tense, no idioms or slang. Natural, happy, kid-friendly content about a child's daily life.
 Output exactly 3 lines. Each line: the English sentence, then " | ", then its simple Chinese translation.
@@ -127,7 +130,7 @@ const request = (lang: SentenceLang, word: string, hint?: string) => serial(asyn
 });
 
 const load = (lang: SentenceLang, word: string, hint?: string): Promise<Sentence[] | null> => {
-  const key = cacheKey(lang, word);
+  const key = cacheKey(lang, word, hint);
   const cached = readCache(key);
   if (cached) return Promise.resolve(cached);
   let p = inflight.get(key);
@@ -163,35 +166,35 @@ export const getSentence = async (
     new Promise<null>(r => setTimeout(() => r(null), timeoutMs)),
   ]);
   if (!list?.length) return null;
-  const key = cacheKey(lang, word);
+  const key = cacheKey(lang, word, hint);
   const i = turn.get(key) ?? Math.floor(Math.random() * list.length);
   turn.set(key, (i + 1) % list.length);
   return list[i % list.length];
 };
 
 // 配置面板手工修改：一行一句，英文行用 “句子 | 中文翻译”；清空表示这个词不读例句
-export const saveSentencesText = (lang: SentenceLang, word: string, text: string) => {
-  writeCache(cacheKey(lang, word), parseLines(lang, text));
+export const saveSentencesText = (lang: SentenceLang, word: string, hint: string | undefined, text: string) => {
+  writeCache(cacheKey(lang, word, hint), parseLines(lang, text));
 };
 
 // 丢掉现有例句，让 AI 重新生成
 export const regenerateSentences = (lang: SentenceLang, word: string, hint?: string) => {
-  const key = cacheKey(lang, word);
+  const key = cacheKey(lang, word, hint);
   if (inflight.has(key)) return;
   memory.delete(key);
   try { localStorage.removeItem(key); } catch {}
   load(lang, word, hint);
 };
 
-export const sentenceState = (lang: SentenceLang, word: string): { status: SentenceStatus; list: Sentence[] } => {
-  const key = cacheKey(lang, word);
+export const sentenceState = (lang: SentenceLang, word: string, hint?: string): { status: SentenceStatus; list: Sentence[] } => {
+  const key = cacheKey(lang, word, hint);
   if (inflight.has(key)) return { status: 'loading', list: [] };
   const list = readCache(key);
   if (list) return { status: list.length ? 'ready' : 'none', list };
   return { status: failed.has(key) ? 'failed' : 'loading', list: [] };
 };
 
-// 配置面板用：词表变化后（停止输入 1 秒）自动给新词生成例句，并在例句变化时刷新
+// 配置面板用：词表变化后（停止输入 2 秒）自动给新词生成例句，并在例句变化时刷新
 export const useSentences = (lang: SentenceLang, words: { word: string; hint?: string }[]) => {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -201,7 +204,7 @@ export const useSentences = (lang: SentenceLang, words: { word: string; hint?: s
   }, []);
   const key = JSON.stringify(words);
   useEffect(() => {
-    const timer = setTimeout(() => words.forEach(w => prefetchSentence(lang, w.word, w.hint)), 1000);
+    const timer = setTimeout(() => words.forEach(w => prefetchSentence(lang, w.word, w.hint)), 2000);
     return () => clearTimeout(timer);
   }, [lang, key]);
 };
