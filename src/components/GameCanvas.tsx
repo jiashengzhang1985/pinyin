@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { pinyin } from 'pinyin-pro';
 import usePersistedState from '@/utils/usePersistedState';
+import { prefetchSentence, getSentence, SentenceLang } from '@/utils/exampleSentence';
 import './GameCanvas.less';
 
 interface Target {
@@ -48,8 +49,21 @@ interface Banner {
   decay: number;
 }
 
+// 击中后飘在下方的例句，目标词高亮
+interface Caption {
+  text: string;
+  word: string;
+  translation?: string;
+  life: number;
+  decay: number;
+}
+
+// 第三关词组列表：用逗号、顿号、空格或换行分隔，只保留含汉字的
+export const splitPhrases = (list: string) =>
+  list.split(/[,，、;；\s]+/).map(s => s.trim()).filter(s => /[\u4e00-\u9fff]/.test(s));
+
 // "let-tuce" → { word: 'lettuce', syllables: ['let', 'tuce'] }
-const parseWord = (raw: string) => {
+export const parseWord = (raw: string) => {
   const parts = raw.split('-').map(p => p.trim()).filter(Boolean);
   return { word: parts.join(''), syllables: parts.length > 1 ? parts : undefined };
 };
@@ -210,7 +224,7 @@ const speakZhAndWait = (text: string) =>
     u.rate = 0.9;
     const v = pickZhVoice();
     if (v) u.voice = v;
-    const timer = setTimeout(resolve, 5000);
+    const timer = setTimeout(resolve, 3000 + text.length * 500);
     u.onend = u.onerror = () => { clearTimeout(timer); resolve(); };
     window.speechSynthesis.speak(u);
   });
@@ -271,6 +285,7 @@ export default function GameCanvas({
   const statsRef = useRef({ hits: 0, correct: 0, wrong: 0, misses: 0, start: Date.now() });
   const comboRef = useRef(0);
   const [banner, setBanner] = useState<Banner | null>(null);
+  const [caption, setCaption] = useState<Caption | null>(null);
   const scored = level === 3 || level === 5;
   const isListen = (level === 5 && englishMode === 'listen') || (level === 3 && hanziMode === 'listen');
   const [totalStars, setTotalStars] = usePersistedState(`level${level}.totalStars`, 0);
@@ -332,7 +347,7 @@ export default function GameCanvas({
       return customList.split(',').map(s => s.trim()).filter(s => s);
     } else if (hanziUnit === 'phrase') {
       // 词组模式：用逗号、顿号、空格或换行分隔
-      const list = customList.split(/[,，、;；\s]+/).map(s => s.trim()).filter(s => /[\u4e00-\u9fff]/.test(s));
+      const list = splitPhrases(customList);
       return list.length ? list : ['中国', '老师', '朋友'];
     } else {
       const list = customList.split('').filter(s => /[\u4e00-\u9fff]/.test(s));
@@ -395,6 +410,7 @@ export default function GameCanvas({
       const pool = validWords.length ? validWords : [{ en: 'apple', zh: '苹果' }];
       const w = pool[drawIndex(pool.length, JSON.stringify(pool))];
       const { word, syllables } = parseWord(w.en);
+      prefetchSentence('en', word.toLowerCase(), w.zh);
       return {
         id: nextIdRef.current++,
         text: englishMode === 'zh' ? (w.zh || word) : word,
@@ -413,6 +429,7 @@ export default function GameCanvas({
     const text = pool[drawIndex(pool.length, pool.join('\u0001'))];
     if (level === 3) {
       const info = getPinyinInfo(text);
+      if (hanziUnit === 'phrase') prefetchSentence('zh', text);
       return {
         id: nextIdRef.current++,
         text,
@@ -436,7 +453,7 @@ export default function GameCanvas({
       speed: speed * 0.3 + 0.2,
       currentInput: '',
     };
-  }, [level, speed, getCharPool, wordKey, englishMode, hanziMode]);
+  }, [level, speed, getCharPool, wordKey, englishMode, hanziMode, hanziUnit]);
 
   // 当前目标需要输入的内容
   const getExpected = (t: Target) => t.answer ?? (level === 3 ? t.pinyin! : t.text);
@@ -569,9 +586,11 @@ export default function GameCanvas({
     }
   }
   // 美式英语发音
-  const speakEnglish = (text: string, rate = 0.85) => {
-    if (!window.speechSynthesis) return;
+  const speakEnglish = (text: string, rate = 0.85) => new Promise<void>(resolve => {
+    if (!window.speechSynthesis) return resolve();
     const utterance = new SpeechSynthesisUtterance(text);
+    const timer = setTimeout(resolve, 3000 + text.length * 250);
+    utterance.onend = utterance.onerror = () => { clearTimeout(timer); resolve(); };
     utterance.lang = 'en-US';
     utterance.rate = rate;
     utterance.pitch = 1.0;
@@ -599,7 +618,7 @@ export default function GameCanvas({
         window.speechSynthesis.onvoiceschanged = null;
       };
     }
-  };
+  });
 
   const playLevel1Sound = (char: string) => {
     if (!window.speechSynthesis) return;
@@ -685,6 +704,7 @@ export default function GameCanvas({
   // 音频播放队列：读字、鼓励语依次播放，不会叠在一起
   const audioChainRef = useRef<Promise<void>>(Promise.resolve());
   const audioBusyRef = useRef(0);
+  const holdRef = useRef(0); // >0 时正在读词+例句：暂停下落和出新目标
   const enqueueAudio = (task: () => Promise<void>) => {
     audioBusyRef.current++;
     audioChainRef.current = audioChainRef.current
@@ -694,8 +714,9 @@ export default function GameCanvas({
   };
 
   // 读汉字/词组：逐个音节播放真人录音（public/mp3），缺录音时才用浏览器语音
-  const playHanziSound = (hz: string) => {
-    enqueueAudio(async () => {
+  const playHanziSound = (hz: string) => enqueueAudio(() => playHanziAndWait(hz));
+  const playHanziAndWait = async (hz: string) => {
+    {
       const chars = [...hz];
       const nums = pinyin(hz, { toneType: 'num', type: 'array' }) as string[];
       for (let i = 0; i < nums.length; i++) {
@@ -706,6 +727,29 @@ export default function GameCanvas({
           if (await playUrl(`${assetBase()}/mp3/${name}.mp3`)) { ok = true; break; }
         }
         if (!ok) await speakZhAndWait(chars[i] || '');
+      }
+    }
+  };
+
+  // 击中后：先读词，再显示并朗读一句带这个词的例句。
+  // 整段放在同一个播放任务里，读完之前不会插入别的声音，也不会掉落新目标。
+  const sayWithExample = (
+    sayWord: () => Promise<void>,
+    example?: { lang: SentenceLang; word: string; hint?: string },
+  ) => {
+    if (example) holdRef.current++;
+    enqueueAudio(async () => {
+      try {
+        const pending = example ? getSentence(example.lang, example.word, example.hint) : null;
+        await sayWord();
+        const s = pending && (await pending);
+        if (!s || !example) return;
+        setCaption({ text: s.text, word: example.word, translation: s.translation, life: 1, decay: 1 / 240 });
+        await new Promise(r => setTimeout(r, 300));
+        if (example.lang === 'zh') await speakZhAndWait(s.text);
+        else await speakEnglish(s.text, 0.8);
+      } finally {
+        if (example) holdRef.current--;
       }
     });
   };
@@ -1024,6 +1068,43 @@ export default function GameCanvas({
     });
     ctx.globalAlpha = 1;
 
+    // 例句：画在下方，目标词用黄色高亮
+    if (caption) {
+      ctx.globalAlpha = Math.min(1, caption.life * 4);
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      const y = canvas.height * 0.72;
+      let size = 30;
+      ctx.font = `bold ${size}px sans-serif`;
+      const max = canvas.width * 0.9;
+      const fullW = ctx.measureText(caption.text).width;
+      if (fullW > max) {
+        size = Math.floor((size * max) / fullW);
+        ctx.font = `bold ${size}px sans-serif`;
+      }
+      const idx = caption.text.toLowerCase().indexOf(caption.word.toLowerCase());
+      const parts = idx < 0
+        ? [{ s: caption.text, hl: false }]
+        : [
+            { s: caption.text.slice(0, idx), hl: false },
+            { s: caption.text.slice(idx, idx + caption.word.length), hl: true },
+            { s: caption.text.slice(idx + caption.word.length), hl: false },
+          ];
+      let x = (canvas.width - ctx.measureText(caption.text).width) / 2;
+      parts.forEach(p => {
+        ctx.fillStyle = p.hl ? '#fbbf24' : '#ffffff';
+        ctx.fillText(p.s, x, y);
+        x += ctx.measureText(p.s).width;
+      });
+      if (caption.translation) {
+        ctx.textAlign = 'center';
+        ctx.font = '20px sans-serif';
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillText(caption.translation, canvas.width / 2, y + size * 0.6 + 18);
+      }
+      ctx.globalAlpha = 1;
+    }
+
     if (scored) {
       // 左上角：累计星星、本轮进度、连击
       ctx.textAlign = 'left';
@@ -1064,7 +1145,7 @@ export default function GameCanvas({
         ctx.globalAlpha = 1;
       }
     }
-  }, [targets, currentTargetId, level, drawSpaceship, drawBullets, drawParticles, handwritingMode, currentTarget, explosions, popups, englishMode, showPinyin, charType, focusLetters, banner, totalStars, roundSize, hanziMode, scored, isListen]);
+  }, [targets, currentTargetId, level, drawSpaceship, drawBullets, drawParticles, handwritingMode, currentTarget, explosions, popups, englishMode, showPinyin, charType, focusLetters, banner, caption, totalStars, roundSize, hanziMode, scored, isListen]);
 
   // 连击达到一定数量时的鼓励语
   // 第五关用英文，第三关用中文
@@ -1099,9 +1180,9 @@ export default function GameCanvas({
   };
 
   // 第五关击中：先按音节慢读（如果有拆分），再正常读一遍
-  const sayWord = (word: string, syllables?: string[]) => {
-    if (syllables) syllables.forEach(sy => speakEnglish(sy, 0.6));
-    speakEnglish(word);
+  const sayWord = async (word: string, syllables?: string[]) => {
+    if (syllables) for (const sy of syllables) await speakEnglish(sy, 0.6);
+    await speakEnglish(word);
   };
 
   // 一轮结束：不暂停游戏，只在屏幕中间飘过星级并累计星星，然后直接开始下一轮
@@ -1131,7 +1212,8 @@ export default function GameCanvas({
   const update = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (scored) {
+    const frozen = holdRef.current > 0; // 读例句时目标停在原地
+    if (scored && !frozen) {
       // 掉到底部没打中：算漏掉，连击中断
       targets.forEach(t => {
         if (t.y + t.speed > canvas.height + 30) {
@@ -1140,7 +1222,7 @@ export default function GameCanvas({
         }
       });
     }
-    setTargets(prev => prev.map(t => {
+    if (!frozen) setTargets(prev => prev.map(t => {
       let ny = t.y + t.speed;
       if (ny > canvas.height + 30) {
         // 如果这个目标被锁定了，解除锁定
@@ -1191,7 +1273,10 @@ export default function GameCanvas({
             } else if (level === 2) {
               setTimeout(() => playFourTones(tg.text), 100);
             } else if (level === 3) {
-              setTimeout(() => playHanziSound(tg.text), 100);
+              sayWithExample(
+                () => playHanziAndWait(tg.text),
+                hanziUnit === 'phrase' ? { lang: 'zh', word: tg.text } : undefined,
+              );
               const px = Math.min(Math.max(b.targetX, 140), canvas.width - 140);
               const py = Math.min(Math.max(b.targetY, 60), canvas.height - 120);
               const toned = tg.toned || tg.pinyin || '';
@@ -1208,7 +1293,10 @@ export default function GameCanvas({
             } else if (level === 5) {
               const word = englishMode === 'zh' ? (tg.answer || '') : tg.text;
               const syllables = tg.syllables;
-              setTimeout(() => sayWord(word, syllables), 100);
+              sayWithExample(
+                () => sayWord(word, syllables),
+                { lang: 'en', word: tg.answer || word.toLowerCase(), hint: tg.translation },
+              );
               const px = Math.min(Math.max(b.targetX, 120), canvas.width - 120);
               const py = Math.min(Math.max(b.targetY, 60), canvas.height - 120);
               setPopups(pp => [...pp, {
@@ -1250,11 +1338,12 @@ export default function GameCanvas({
       .map(p => ({ ...p, y: p.y - 0.8, life: p.life - p.decay }))
       .filter(p => p.life > 0));
     setBanner(prev => (prev && prev.life > 0.03 ? { ...prev, life: prev.life - prev.decay } : null));
+    setCaption(prev => (prev && prev.life > 0.01 ? { ...prev, life: prev.life - prev.decay } : null));
     if (currentTargetId !== null) {
       const tg = targets.find(t => t.id === currentTargetId);
       if (tg) spaceshipXRef.current += (tg.x - spaceshipXRef.current) * 0.15;
     }
-  }, [currentTargetId, targets, level, englishMode, roundSize, scored]);
+  }, [currentTargetId, targets, level, englishMode, roundSize, scored, hanziUnit]);
 
   const gameLoop = useCallback((t: number) => {
     if (t - lastUpdateTimeRef.current >= 1000/30) {
@@ -1507,6 +1596,7 @@ export default function GameCanvas({
 
   useEffect(() => {
     const si = setInterval(() => {
+      if (holdRef.current > 0) return; // 读完例句再出新目标
       setTargets(p => p.length < maxCount ? [...p, createTarget()] : p);
     }, 2000 / speed);
     return () => clearInterval(si);
@@ -1530,6 +1620,7 @@ export default function GameCanvas({
     setParticles([]);
     setPopups([]);
     setBanner(null);
+    setCaption(null);
     hitIdsRef.current.clear();
     announcedRef.current.clear();
     statsRef.current = { hits: 0, correct: 0, wrong: 0, misses: 0, start: Date.now() };

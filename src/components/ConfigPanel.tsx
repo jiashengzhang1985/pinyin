@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { parseWord, splitPhrases } from './GameCanvas';
 import type { WordEntry, EnglishMode, HanziMode, HanziUnit } from './GameCanvas';
+import SentenceEditor from './SentenceEditor';
 import usePersistedState from '@/utils/usePersistedState';
 import './ConfigPanel.less';
 
@@ -26,6 +28,12 @@ interface ConfigPanelProps {
   hanziUnit?: HanziUnit;
   onHanziUnitChange?: (unit: HanziUnit) => void;
 }
+
+// 去掉空词和重复的词
+const dedupe = (words: { word: string; hint?: string }[]) => {
+  const seen = new Set<string>();
+  return words.filter(w => w.word && !seen.has(w.word) && (seen.add(w.word), true));
+};
 
 export default function ConfigPanel({
   level,
@@ -355,6 +363,18 @@ export default function ConfigPanel({
         </div>
       )}
 
+      {level === 5 && (
+        <SentenceEditor
+          lang="en"
+          disabled={isLocked}
+          words={dedupe(wordList.map(w => ({ word: parseWord(w.en).word.toLowerCase(), hint: w.zh.trim() || undefined })))}
+        />
+      )}
+
+      {level === 3 && hanziUnit === 'phrase' && (
+        <SentenceEditor lang="zh" disabled={isLocked} words={dedupe(splitPhrases(customList).map(word => ({ word })))} />
+      )}
+
       {level === 3 && hanziMode === 'see' && (
         <div className="config-section">
           <label>显示拼音提示</label>
@@ -377,11 +397,11 @@ export default function ConfigPanel({
           <li>🔄 未击中会重新掉落</li>
           {level === 3 && <li>📝 输入进度显示在汉字下方</li>}
           {level === 2 && <li>🔊 击中后播放四声发音</li>}
-          {level === 3 && <li>🔊 击中后读出汉字，并显示带声调的拼音</li>}
+          {level === 3 && <li>🔊 击中后读出汉字，并显示带声调的拼音；词组还会读一句例句</li>}
           {level === 3 && <li>✏️ 打错字母不会清空，ü 用 v 输入</li>}
           {level === 3 && <li>🎧 听音模式按空格再听一遍</li>}
           {level === 3 && <li>⭐ 连续打对有连击奖励，每轮结束自动评星</li>}
-          {level === 5 && <li>🔊 击中后美式发音，并显示中文</li>}
+          {level === 5 && <li>🔊 击中后美式发音，并显示中文，再读一句例句</li>}
           {level === 5 && <li>✏️ 打错字母不会清空，继续打对的即可</li>}
           {level === 5 && <li>🎧 听写模式按空格再听一遍</li>}
           {level === 5 && <li>⭐ 连续打对有连击奖励，每轮结束自动评星，不打断游戏</li>}

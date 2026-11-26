@@ -160,6 +160,70 @@
       margin-top: 6px;
     }
 
+    .sentence-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .sentence-row {
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #e0e0e0;
+    }
+
+    .sentence-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .sentence-word {
+      flex: 1;
+      font-weight: bold;
+      color: #333;
+
+      small { font-weight: normal; color: #888; }
+    }
+
+    .sentence-status {
+      font-size: 12px;
+      color: #888;
+
+      &.failed { color: #ef4444; }
+    }
+
+    .sentence-regen {
+      flex: none;
+      padding: 2px 8px;
+      border: 1px solid #667eea;
+      border-radius: 6px;
+      background: white;
+      color: #667eea;
+      font-size: 12px;
+      cursor: pointer;
+
+      &:disabled { border-color: #ccc; color: #aaa; cursor: not-allowed; }
+    }
+
+    .sentence-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.5;
+      font-family: inherit;
+      resize: vertical;
+
+      &:focus { outline: none; border-color: #667eea; }
+      &:disabled { background: #f5f5f5; color: #888; }
+    }
+
     .radio-group {
       display: flex;
       flex-direction: column;

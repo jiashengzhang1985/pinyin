@@ -23,14 +23,6 @@ export default function Level5Page() {
   return (
     <div className="level-page">
       <div className="game-area">
-        <div className="level-header level-5">
-          <h2>第五关：英语单词</h2>
-          <p>
-            {mode === 'en' && '照着英文单词打字，击中后读出单词并显示中文'}
-            {mode === 'zh' && '看中文拼出英文单词，击中后读出单词'}
-            {mode === 'listen' && '听发音拼出英文单词，按空格可以再听一遍'}
-          </p>
-        </div>
         <GameCanvas
           level={5}
           speed={speed}

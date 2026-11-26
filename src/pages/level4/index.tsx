@@ -236,11 +236,7 @@ export default function Level4Page() {
   return (
     <div className="level-page">
       <div className="game-area">
-        <div className="level-header level-4">
-          <h2>第四关：手写挑战</h2>
-          <p>在手写区域写出目标汉字来击落它们</p>
-          <div className="success-counter">成功击落：{successCount} 个</div>
-        </div>
+        <div className="success-counter">成功击落：{successCount} 个</div>
         <GameCanvas
           level={3}
           speed={speed}

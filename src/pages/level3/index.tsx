@@ -20,14 +20,6 @@ export default function Level3Page() {
   return (
     <div className="level-page">
       <div className="game-area">
-        <div className="level-header level-3">
-          <h2>第三关：汉字挑战</h2>
-          <p>
-            {mode === 'listen'
-              ? `听发音打出${unit === 'phrase' ? '词组' : '汉字'}的拼音，按空格可以再听一遍`
-              : `输入${unit === 'phrase' ? '整个词组' : '汉字'}的拼音击落目标，下方显示输入进度`}
-          </p>
-        </div>
         <GameCanvas
           level={3}
           speed={speed}
