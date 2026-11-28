@@ -1,0 +1,407 @@
+.battle {
+  --h: 220px;
+  --hero-x: 3%;
+  position: relative;
+  height: var(--h);
+  flex-shrink: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 75% 30%, #3b2a7a 0%, #1a1640 55%, #0b0a24 100%);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6), 0 6px 18px rgba(0, 0, 0, 0.3);
+  user-select: none;
+
+  .stars {
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(1.5px 1.5px at 12% 20%, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 30% 60%, #fff 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 48% 15%, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 62% 45%, #ddd 50%, transparent 51%),
+      radial-gradient(2px 2px at 85% 12%, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 92% 55%, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 20% 80%, #ccc 50%, transparent 51%);
+    opacity: 0.8;
+  }
+
+  .ground {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 22px;
+    background: linear-gradient(180deg, #4c1d95, #2e1065);
+    border-top: 2px solid #7c3aed;
+  }
+}
+
+// ---------- 左上角信息 ----------
+.battle-hud {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  z-index: 3;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+
+  .hud-score { font-size: 24px; font-weight: 800; }
+  .hud-combo { font-size: 15px; opacity: 0.85; }
+  .hud-combo.hot { color: #fbbf24; opacity: 1; font-weight: 800; animation: hot-pulse 0.8s infinite alternate; }
+  .hud-coll { font-size: 13px; opacity: 0.75; }
+}
+@keyframes hot-pulse { to { transform: scale(1.08); text-shadow: 0 0 10px #f59e0b; } }
+
+// ---------- 射手 ----------
+.hero {
+  position: absolute;
+  left: var(--hero-x);
+  bottom: 18px;
+  width: 170px;
+  height: 138px;
+  z-index: 2;
+
+  .soldier {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 170px;
+    height: 138px;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+  }
+
+  .muzzle {
+    position: absolute;
+    left: 146px;
+    bottom: 73px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, #fde047 35%, #f97316 60%, transparent 70%);
+    animation: muzzle 0.16s ease-out forwards;
+
+    &.crit { background: radial-gradient(circle, #fff 0%, #a5f3fc 35%, #c084fc 60%, transparent 70%); }
+  }
+}
+@keyframes muzzle {
+  0% { transform: scale(0.4); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+// ---------- 子弹（起点、方向由 JS 量好后用 CSS 变量传进来） ----------
+.bullet {
+  position: absolute;
+  z-index: 2;
+  width: 54px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 6px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, transparent, #f97316 30%, #fde047 70%, #fff);
+  box-shadow: 0 0 10px #facc15, 0 0 22px #f97316;
+  animation: bullet-fly 0.22s linear forwards;
+
+  &.crit {
+    height: 18px;
+    width: 90px;
+    margin-top: -9px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, transparent, #7c3aed 25%, #22d3ee 70%, #fff);
+    box-shadow: 0 0 14px #22d3ee, 0 0 30px #a855f7;
+    animation-duration: 0.18s;
+  }
+}
+@keyframes bullet-fly {
+  from { transform: translate(0, 0) rotate(var(--ang)); }
+  to { transform: translate(var(--dx), var(--dy)) rotate(var(--ang)); }
+}
+// 打偏的子弹：飞得慢一点、越飞越淡
+.bullet.miss {
+  animation: bullet-miss 0.34s linear forwards;
+}
+@keyframes bullet-miss {
+  0% { transform: translate(0, 0) rotate(var(--ang)); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--ang)); opacity: 0.2; }
+}
+
+.miss-mark {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+
+  .miss-text {
+    display: block;
+    font-weight: 900;
+    font-size: 20px;
+    color: #cbd5e1;
+    font-style: italic;
+    -webkit-text-stroke: 1px #334155;
+    animation: miss-up 0.9s ease-out forwards;
+  }
+
+  .dust {
+    position: absolute;
+    left: 50%;
+    top: 60%;
+    font-size: 30px;
+    animation: dust 0.8s ease-out forwards;
+  }
+
+  &.ground .miss-text { margin-top: -30px; }
+}
+@keyframes miss-up {
+  0% { transform: scale(0.6); opacity: 0; }
+  20% { transform: scale(1.2); opacity: 1; }
+  100% { transform: translateY(-24px) scale(1); opacity: 0; }
+}
+@keyframes dust {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
+  100% { transform: translate(-50%, -80%) scale(1.6); opacity: 0; }
+}
+
+// ---------- 怪兽 ----------
+.monster-zone {
+  position: absolute;
+  right: 6%;
+  top: 8px;
+  bottom: 22px;
+  width: 230px;
+  z-index: 1;
+}
+
+.hpbox {
+  position: relative;
+  z-index: 3;
+  transition: opacity 0.4s;
+
+  &.gone { opacity: 0; }
+
+  .hp-name {
+    display: flex;
+    justify-content: space-between;
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+    text-shadow: 0 1px 3px #000;
+  }
+  .hp-num { font-family: monospace; font-size: 15px; color: #fecaca; }
+
+  .hp-bar {
+    position: relative;
+    height: 16px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    overflow: hidden;
+
+    .hp-lag, .hp-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+    }
+    // 白色“残血”慢慢缩，看得出这一下扣了多少
+    .hp-lag { background: #fff; transition: width 0.7s 0.25s ease; }
+    .hp-fill {
+      background: linear-gradient(180deg, #4ade80, #16a34a);
+      transition: width 0.12s;
+      &.mid { background: linear-gradient(180deg, #fde047, #eab308); }
+      &.low { background: linear-gradient(180deg, #f87171, #dc2626); }
+    }
+  }
+}
+
+.monster {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  font-size: 140px;
+  line-height: 1;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.5));
+  animation: m-idle 2s ease-in-out infinite;
+
+  &.enter { animation: m-enter 0.5s cubic-bezier(0.2, 1.4, 0.4, 1), m-idle 2s 0.5s ease-in-out infinite; }
+  &.hit { animation: m-hit 0.35s ease, m-idle 2s 0.35s ease-in-out infinite; }
+  &.laugh { animation: m-laugh 0.7s ease, m-idle 2s 0.7s ease-in-out infinite; }
+  &.die { animation: m-die 0.6s ease-in forwards; }
+}
+@keyframes m-idle {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-8px); }
+}
+@keyframes m-enter {
+  0% { transform: translateX(200%) scale(0.6); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+@keyframes m-hit {
+  0% { transform: translateX(-50%); filter: brightness(4) saturate(0); }
+  30% { transform: translateX(-30%) rotate(10deg) scale(0.9); filter: brightness(3) saturate(0); }
+  100% { transform: translateX(-50%); filter: none; }
+}
+@keyframes m-laugh {
+  0%, 100% { transform: translateX(-50%) rotate(0); }
+  20% { transform: translateX(-50%) translateY(-20px) rotate(-12deg); }
+  40% { transform: translateX(-50%) rotate(12deg); }
+  60% { transform: translateX(-50%) translateY(-12px) rotate(-8deg); }
+}
+@keyframes m-die {
+  0% { transform: translateX(-50%) scale(1); filter: brightness(4) saturate(0); opacity: 1; }
+  40% { transform: translateX(-40%) scale(1.25) rotate(15deg); filter: brightness(3) saturate(0); opacity: 1; }
+  100% { transform: translateX(-20%) scale(0.2) rotate(120deg); opacity: 0; }
+}
+
+.boom {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  font-size: 150px;
+  line-height: 1;
+  pointer-events: none;
+  animation: boom 0.7s ease-out forwards;
+}
+@keyframes boom {
+  0% { transform: translateX(-50%) scale(0.2); opacity: 1; }
+  50% { transform: translateX(-50%) scale(1.3); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1.7); opacity: 0; }
+}
+
+.spark {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 58%;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 10px 2px rgba(255, 200, 80, 0.9);
+  animation: spark 0.7s ease-out forwards;
+}
+@keyframes spark {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2); opacity: 0; }
+}
+
+.ring {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 58%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 6px solid #fde047;
+  box-shadow: 0 0 20px #f97316, inset 0 0 14px #fff;
+  pointer-events: none;
+  animation: ring 0.45s ease-out forwards;
+
+  &.crit { border-color: #67e8f9; box-shadow: 0 0 24px #a855f7, inset 0 0 14px #fff; }
+}
+@keyframes ring {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(4); opacity: 0; border-width: 1px; }
+}
+
+.dmg-float {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  z-index: 4;
+  white-space: nowrap;
+  font-weight: 900;
+  font-size: 34px;
+  color: #ff4d4d;
+  -webkit-text-stroke: 1.5px #fff;
+  pointer-events: none;
+  animation: dmg-up 1.1s ease-out forwards;
+
+  &.crit { color: #22d3ee; font-size: 44px; -webkit-text-stroke: 2px #4c1d95; }
+  &.ko { color: #fde047; font-size: 30px; top: 55%; -webkit-text-stroke: 1.5px #92400e; }
+}
+@keyframes dmg-up {
+  0% { transform: translate(-50%, 10px) scale(0.5); opacity: 0; }
+  15% { transform: translate(-30%, -10px) scale(1.3); opacity: 1; }
+  30% { transform: translate(-30%, -14px) scale(1); }
+  100% { transform: translate(-20%, -60px) scale(1); opacity: 0; }
+}
+
+.bubble {
+  position: absolute;
+  right: 92%;
+  top: 30%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 4px 12px 4px 6px;
+  border-radius: 14px;
+  background: #fff;
+  color: #6d28d9;
+  font-weight: 700;
+  font-size: 16px;
+  animation: bubble 2s ease forwards;
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    border: 6px solid transparent;
+    border-left-color: #fff;
+    transform: translateY(-50%);
+  }
+}
+.bubble .smirk {
+  font-size: 34px;
+  line-height: 1;
+  display: inline-block;
+  animation: smirk 0.5s ease-in-out 3 alternate;
+}
+@keyframes smirk {
+  from { transform: rotate(-12deg) scale(1); }
+  to { transform: rotate(12deg) scale(1.15); }
+}
+
+@keyframes bubble {
+  0% { transform: scale(0); opacity: 0; }
+  15% { transform: scale(1.1); opacity: 1; }
+  25%, 85% { transform: scale(1); opacity: 1; }
+  100% { opacity: 0; }
+}
+
+// ---------- 不同屏幕 ----------
+// 横屏矮屏（手机横着拿）：战场压扁，人和怪兽缩小
+@media (max-height: 500px) {
+  .battle { --h: 124px; }
+  .hero { transform-origin: left bottom; scale: 0.6; bottom: 14px; }
+  .monster-zone { width: 170px; top: 6px; bottom: 16px; }
+  .monster, .boom { font-size: 78px; }
+  .hpbox .hp-name { font-size: 13px; margin-bottom: 2px; }
+  .hpbox .hp-bar { height: 12px; }
+  .battle-hud .hud-score { font-size: 18px; }
+  .battle-hud .hud-combo { font-size: 13px; }
+  .battle .ground { height: 14px; }
+}
+
+// 竖屏窄屏（手机竖着拿）：战场加高，射手在左下、怪兽在右上，斜着射，拉开距离
+@media (max-width: 600px) and (min-height: 501px) {
+  .battle { --h: 236px; }
+  .hero { transform-origin: left bottom; scale: 0.62; left: 2%; }
+  .battle-hud { top: 8px; left: 10px; }
+  .monster-zone {
+    right: 3%;
+    top: 8px;
+    bottom: auto;
+    height: 150px;
+    width: 150px;
+  }
+  .monster, .boom { font-size: 92px; }
+  .hpbox .hp-name { font-size: 13px; }
+  .hpbox .hp-bar { height: 12px; }
+  .bubble { right: 70%; top: 70%; font-size: 14px; }
+}

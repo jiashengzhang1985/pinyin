@@ -1,0 +1,42 @@
+.math-config {
+  .config-section > label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .row-label {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+
+    input { width: 20px; height: 20px; }
+  }
+
+  .chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chip {
+    padding: 6px 12px;
+    border: 2px solid #c7d2fe;
+    border-radius: 999px;
+    background: #fff;
+    color: #4338ca;
+    font-size: 15px;
+    cursor: pointer;
+
+    &.active {
+      background: #6366f1;
+      border-color: #6366f1;
+      color: #fff;
+    }
+  }
+
+  .hint a {
+    color: #6366f1;
+    cursor: pointer;
+  }
+}

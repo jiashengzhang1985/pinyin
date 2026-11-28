@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-134 -113 780 780">
+  <defs>
+    <linearGradient id="bgA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a7cf0"/><stop offset="1" stop-color="#7b3fb0"/></linearGradient>
+    <linearGradient id="goldA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe680"/><stop offset="0.55" stop-color="#ffc21a"/><stop offset="1" stop-color="#e08a00"/></linearGradient>
+    <linearGradient id="goldB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd54a"/><stop offset="1" stop-color="#c97200"/></linearGradient>
+  </defs>
+  
+  <!-- 书 -->
+  <path d="M88 352 Q172 318 256 350 L256 432 Q172 402 88 434 Z" fill="#ffffff"/>
+  <path d="M424 352 Q340 318 256 350 L256 432 Q340 402 424 434 Z" fill="#f1f3ff"/>
+  <path d="M84 434 Q172 404 256 436 Q340 404 428 434 L428 446 Q340 418 256 450 Q172 418 84 446 Z" fill="#ff8a3d"/>
+  <path d="M112 366 Q170 344 232 362 M112 388 Q170 366 232 384 M280 362 Q342 344 400 366 M280 384 Q342 366 400 388" stroke="#c7cdf5" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <!-- 元宝 -->
+  <ellipse cx="256" cy="246" rx="70" ry="62" fill="url(#goldA)"/>
+  <ellipse cx="234" cy="222" rx="22" ry="16" fill="#fff6c7" opacity="0.8"/>
+  <path d="M112 236 Q136 322 256 330 Q376 322 400 236 Q346 286 256 286 Q166 286 112 236 Z" fill="url(#goldB)"/>
+  <path d="M112 236 Q166 286 256 286 Q346 286 400 236 Q352 268 256 270 Q160 268 112 236 Z" fill="#ffe27a"/>
+  <!-- 星星 -->
+  <path d="M120 120 l10 26 26 10 -26 10 -10 26 -10 -26 -26 -10 26 -10 z" fill="#fff59d"/>
+  <path d="M398 104 l7 18 18 7 -18 7 -7 18 -7 -18 -18 -7 18 -7 z" fill="#ffffff"/>
+  <path d="M420 200 l5 12 12 5 -12 5 -5 12 -5 -12 -12 -5 12 -5 z" fill="#fff59d"/>
+</svg>

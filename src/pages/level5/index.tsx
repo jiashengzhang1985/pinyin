@@ -9,6 +9,7 @@ export default function Level5Page() {
   const [speed, setSpeed] = usePersistedState('level5.speed', 2);
   const [count, setCount] = usePersistedState('level5.count', 1);
   const [mode, setMode] = usePersistedState<EnglishMode>('level5.mode', 'en');
+  const [sentenceRate, setSentenceRate] = usePersistedState('level5.sentenceRate', 0.8);
   const [words, setWords] = usePersistedState<WordEntry[]>('level5.words', DEFAULT_WORDS);
 
   // 以前保存的词表里可能有“let-tuce”这种拆音节写法，去掉“-”
@@ -25,6 +26,7 @@ export default function Level5Page() {
           maxCount={count}
           wordList={words}
           englishMode={mode}
+          sentenceRate={sentenceRate}
         />
       }
       config={
@@ -36,6 +38,8 @@ export default function Level5Page() {
           onCountChange={setCount}
           englishMode={mode}
           onEnglishModeChange={setMode}
+          sentenceRate={sentenceRate}
+          onSentenceRateChange={setSentenceRate}
           wordList={words}
           onWordListChange={setWords}
         />

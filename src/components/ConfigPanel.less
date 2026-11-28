@@ -7,6 +7,98 @@
   max-height: calc(100vh - 40px);
   overflow-y: auto;
 
+  // 标题行：左边“游戏设置”，右边“返回首页”
+  .config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+
+    h3 {
+      margin: 0;
+      padding: 0;
+      border: none;
+    }
+  }
+
+  .photo-import {
+    margin-bottom: 12px;
+
+    .photo-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .photo-btn {
+      flex: 2;
+      padding: 10px;
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      white-space: nowrap;
+
+      &.alt {
+        flex: 1;
+        background: #64748b;
+      }
+    }
+
+    .hint {
+      margin-top: 6px;
+    }
+  }
+
+  .rate-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .slider {
+      flex: 1;
+    }
+
+    .rate-test {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      background: #22c55e;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  }
+
+  .home-btn {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: #5568d3;
+    }
+  }
+
   h3 {
     margin-top: 0;
     font-size: 20px;
@@ -322,5 +414,102 @@
 
   &:hover {
     background: #999;
+  }
+}
+
+// 拍照识别的确认框（挂在 body 上，手机抽屉里也能正常居中）
+.photo-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.photo-dialog {
+  width: min(480px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px 18px 14px;
+  color: #333;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+
+  h4 {
+    margin: 0 0 12px;
+    font-size: 18px;
+  }
+
+  section {
+    margin-bottom: 12px;
+  }
+
+  .pd-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 14px;
+
+    li {
+      margin-bottom: 6px;
+    }
+  }
+
+  .pd-sentence {
+    color: #475569;
+    font-size: 13px;
+
+    span {
+      color: #94a3b8;
+    }
+  }
+
+  .pd-muted {
+    color: #94a3b8;
+  }
+
+  .pd-note {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 12px;
+  }
+
+  .pd-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+
+    button {
+      padding: 9px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .pd-cancel {
+      background: #e2e8f0;
+      color: #334155;
+    }
+
+    .pd-ok {
+      background: #10b981;
+      color: #fff;
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+    }
   }
 }

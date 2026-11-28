@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { parseWord, splitPhrases } from './GameCanvas';
+import { history } from 'umi';
+import { parseWord, splitPhrases, speakEnglishAtRate } from './GameCanvas';
 import { cleanWord } from '@/utils/wordList';
 import type { WordEntry, EnglishMode, HanziMode, HanziUnit } from './GameCanvas';
 import SentenceEditor from './SentenceEditor';
+import PhotoWordImport from './PhotoWordImport';
 import usePersistedState from '@/utils/usePersistedState';
 import './ConfigPanel.less';
 
@@ -20,6 +22,8 @@ interface ConfigPanelProps {
   onShowPinyinChange?: (show: boolean) => void;
   englishMode?: EnglishMode;
   onEnglishModeChange?: (mode: EnglishMode) => void;
+  sentenceRate?: number;
+  onSentenceRateChange?: (rate: number) => void;
   wordList?: WordEntry[];
   onWordListChange?: (words: WordEntry[]) => void;
   hanziMode?: HanziMode;
@@ -48,6 +52,8 @@ export default function ConfigPanel({
   onShowPinyinChange,
   englishMode = 'en',
   onEnglishModeChange,
+  sentenceRate = 0.8,
+  onSentenceRateChange,
   wordList = [],
   onWordListChange,
   hanziMode = 'see',
@@ -90,7 +96,10 @@ export default function ConfigPanel({
 
   return (
     <div className="config-panel">
-      <h3>游戏设置</h3>
+      <div className="config-header">
+        <h3>游戏设置</h3>
+        <button className="home-btn" onClick={() => history.push('/')}>🏠 返回首页</button>
+      </div>
       {(level === 2 || level === 3 || level === 5) && (
         <div className="config-section">
           <label>锁定列表</label>
@@ -291,7 +300,29 @@ export default function ConfigPanel({
 
       {level === 5 && (
         <div className="config-section">
+          <label>例句语速</label>
+          <div className="rate-row">
+            <input
+              type="range"
+              min="0.5"
+              max="1.2"
+              step="0.05"
+              value={sentenceRate}
+              onChange={(e) => onSentenceRateChange?.(Number(e.target.value))}
+              className="slider"
+            />
+            <button className="rate-test" onClick={() => speakEnglishAtRate('I eat my cereal with a spoon.', sentenceRate)}>
+              🔊 试听
+            </button>
+          </div>
+          <div className="value-display">{sentenceRate.toFixed(2)} 倍{sentenceRate === 1 ? '（正常）' : sentenceRate < 1 ? '（慢）' : '（快）'}</div>
+        </div>
+      )}
+
+      {level === 5 && (
+        <div className="config-section">
           <label>单词列表（{wordList.length} 个）</label>
+          <PhotoWordImport wordList={wordList} onWordListChange={onWordListChange} disabled={isLocked} />
           <div className="word-list">
             {wordList.map((w, i) => (
               <div className="word-row" key={i}>
@@ -342,7 +373,6 @@ export default function ConfigPanel({
             )}
           </div>
           <div className="hint">按回车或 + 添加，修改后立即生效并自动保存</div>
-          <div className="hint">用 - 分音节，如 let-tuce，击中后先慢读音节再读整词</div>
         </div>
       )}
 
@@ -392,12 +422,6 @@ export default function ConfigPanel({
         </ul>
       </div>
 
-      <button
-        className="back-btn"
-        onClick={() => window.history.back()}
-      >
-        返回首页
-      </button>
     </div>
   );
 }

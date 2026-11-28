@@ -173,6 +173,9 @@ const ZH_ROUND_CLIPS: Record<number, string[]> = {
 };
 const pickOne = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
+/** 按倍速读英文（1 为正常速度）：有道录音按倍速播放，系统语音的语速相应调整 */
+export const speakEnglishAtRate = (text: string, rate: number) => speak(text, 'en-US', rate * 0.875, rate);
+
 const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 // 用系统语音读中文，读完后返回（App 里走原生 TTS）
@@ -190,6 +193,7 @@ interface GameCanvasProps {
   showPinyin?: boolean;
   wordList?: WordEntry[];
   englishMode?: EnglishMode;
+  sentenceRate?: number; // 第四关英文例句的语速（1 为正常速度）
   hanziMode?: HanziMode;
   hanziUnit?: HanziUnit;
 }
@@ -206,6 +210,7 @@ export default function GameCanvas({
   showPinyin = false,
   wordList = [],
   englishMode = 'en',
+  sentenceRate = 0.8,
   hanziMode = 'see',
   hanziUnit = 'char',
 }: GameCanvasProps) {
@@ -216,6 +221,8 @@ export default function GameCanvas({
   const [particles, setParticles] = useState<Particle[]>([]);
   const [popups, setPopups] = useState<Popup[]>([]);
   const popupIdRef = useRef(0);
+  // 第四关击中的单词一直留在屏幕上：'audio' 正在拼读/读例句，'caption' 读完了、等例句消失后再一起消失
+  const heldPopupsRef = useRef(new Map<number, 'audio' | 'caption'>());
   const hitIdsRef = useRef<Set<number>>(new Set()); // 防止同一目标被重复结算
   // 只保留英文非空的单词
   const validWords = wordList
@@ -228,6 +235,8 @@ export default function GameCanvas({
   const comboRef = useRef(0);
   const [banner, setBanner] = useState<Banner | null>(null);
   const [caption, setCaption] = useState<Caption | null>(null);
+  const captionRef = useRef<Caption | null>(null);
+  captionRef.current = caption;
   const captionBoxRef = useRef<{ x0: number; x1: number; y0: number; y1: number } | null>(null); // 例句在画布上的区域，用于点击复读
   const scored = level === 3 || level === 5;
   const isListen = (level === 5 && englishMode === 'listen') || (level === 3 && hanziMode === 'listen');
@@ -411,7 +420,7 @@ export default function GameCanvas({
       x: spaceshipXRef.current,
       y: canvas.height - 50,
       targetX, targetY, targetId,
-      speed: 40,
+      speed: 100, // 子弹要快：声音在子弹打中时才开始
     }]);
     try {
       const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -523,7 +532,9 @@ export default function GameCanvas({
     if (name) speak(name, 'zh-CN', 0.8);
   }
   // 美式英语发音
-  const speakEnglish = (text: string, rate = 0.85) => speak(text, 'en-US', rate);
+  const speakEnglish = (text: string, rate = 0.85, audioSpeed = 1) => speak(text, 'en-US', rate, audioSpeed);
+  // 英文例句按设置的语速读：录音按这个倍速播放（音调不变），系统语音也相应放慢
+  const speakEnglishSentence = (text: string) => speakEnglishAtRate(text, sentenceRate);
 
   const playLevel1Sound = (char: string) => {
     
@@ -649,6 +660,7 @@ export default function GameCanvas({
   const sayWithExample = (
     sayWord: () => Promise<void>,
     example?: { lang: SentenceLang; word: string; hint?: string },
+    onDone?: () => void,
   ) => {
     if (example) holdRef.current++;
     enqueueAudio(async () => {
@@ -666,10 +678,11 @@ export default function GameCanvas({
         if (!s || !example) return;
         setCaption({ text: s.text, word: example.word, translation: s.translation, lang: example.lang, reading: true, life: 1, decay: CAPTION_DECAY });
         if (example.lang === 'zh') await speakZhAndWait(s.text);
-        else await speakEnglish(s.text, 0.8);
+        else await speakEnglishSentence(s.text);
         setCaption(c => (c && c.text === s.text ? { ...c, reading: false, life: 1 } : c));
       } finally {
         if (example) holdRef.current--;
+        onDone?.();
       }
     });
   };
@@ -1092,9 +1105,11 @@ export default function GameCanvas({
   const sayWord = async (word: string) => {
     const letters = [...word.toLowerCase()].filter(ch => /[a-z]/.test(ch));
     preloadWordSpelling(word);
-    // 字母一个接一个，拼完立刻读整个单词，中间不停顿
-    for (const ch of letters) {
+    // 字母之间停一下，让孩子跟得上；拼完最后一个字母立刻读整个单词
+    for (let i = 0; i < letters.length; i++) {
+      const ch = letters[i];
       if (!(await playClip(`voice/en/letters/${ch}.m4a`))) await speakEnglish(ch.toUpperCase(), 0.8);
+      if (i < letters.length - 1) await pause(300);
     }
     await speakEnglish(word);
   };
@@ -1204,14 +1219,19 @@ export default function GameCanvas({
               recordHit();
             } else if (level === 5) {
               const word = englishMode === 'zh' ? (tg.answer || '') : tg.text;
+              // 单词和中文一直留着，直到例句读完、例句消失，方便孩子对照着记
+              const popupId = popupIdRef.current++;
+              heldPopupsRef.current.set(popupId, 'audio');
               sayWithExample(
                 () => sayWord(word),
                 { lang: 'en', word: tg.answer || word.toLowerCase(), hint: tg.translation },
+                () => heldPopupsRef.current.set(popupId, 'caption'),
               );
               const px = Math.min(Math.max(b.targetX, 120), canvas.width - 120);
-              const py = Math.min(Math.max(b.targetY, 60), canvas.height - 120);
+              // 放在例句（画面 72% 高处）上方，不要叠在一起
+              const py = Math.min(Math.max(b.targetY, 60), canvas.height * 0.72 - 110);
               setPopups(pp => [...pp, {
-                id: popupIdRef.current++,
+                id: popupId,
                 x: px, y: py,
                 en: word,
                 zh: tg.translation || '',
@@ -1231,7 +1251,7 @@ export default function GameCanvas({
         }
         
         // 子弹继续飞行
-        const r = b.speed / dist;
+        const r = Math.min(1, b.speed / dist); // 最后一步正好落在目标上，不飞过头
         updated.push({ ...b, x: b.x + dx*r, y: b.y + dy*r });
       });
       
@@ -1243,8 +1263,11 @@ export default function GameCanvas({
       life: p.life-0.035
     })).filter(p => p.life > 0));
     // 弹出文字约 0.8 秒后消失，并缓慢上浮
+    // 第四关留着的单词：读完且例句消失后才开始淡出
+    const held = heldPopupsRef.current;
+    if (!captionRef.current) held.forEach((st, id) => { if (st === 'caption') held.delete(id); });
     setPopups(prev => prev.length === 0 ? prev : prev
-      .map(p => ({ ...p, y: p.y - 0.8, life: p.life - p.decay }))
+      .map(p => (held.has(p.id) ? p : { ...p, y: p.y - 0.8, life: p.life - p.decay }))
       .filter(p => p.life > 0));
     setBanner(prev => (prev && prev.life > 0.03 ? { ...prev, life: prev.life - prev.decay } : null));
     setCaption(prev => (prev?.reading ? prev : prev && prev.life > 0.01 ? { ...prev, life: prev.life - prev.decay } : null));
@@ -1534,6 +1557,7 @@ export default function GameCanvas({
     setBullets([]); 
     setParticles([]);
     setPopups([]);
+    heldPopupsRef.current.clear();
     setBanner(null);
     setCaption(null);
     hitIdsRef.current.clear();
@@ -1572,7 +1596,7 @@ export default function GameCanvas({
     enqueueAudio(async () => {
       try {
         if (lang === 'zh') await speakZhAndWait(text);
-        else await speakEnglish(text, 0.8);
+        else await speakEnglishSentence(text);
       } finally {
         holdRef.current--;
         setCaption(c => (c && c.text === text ? { ...c, reading: false, life: 1 } : c)); // 读完再留 1.5 秒

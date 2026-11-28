@@ -4,3 +4,17 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# 有道发音转发：网页同域读取声音数据，才能提前解码、去掉前后静音（App 不走这里）
+[[redirects]]
+  from = "/yd/*"
+  to = "https://dict.youdao.com/:splat"
+  status = 200
+  force = true
+
+# 智谱接口转发：浏览器不允许网页直接跨域调用智谱（App 走原生请求，不经过这里）
+[[redirects]]
+  from = "/zhipu/*"
+  to = "https://open.bigmodel.cn/:splat"
+  status = 200
+  force = true

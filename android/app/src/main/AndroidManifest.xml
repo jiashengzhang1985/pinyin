@@ -39,4 +39,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 设置里“拍照识别单词”用 -->
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>

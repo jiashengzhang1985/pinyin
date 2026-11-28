@@ -2,19 +2,21 @@
 // 例句由免费的大模型 API 生成，结果保存在本机，同一个词只请求一次；
 // 在配置面板里可以查看、手工修改或重新生成。
 // 两家服务：国外用 Google Gemini，国内用智谱 GLM（Gemini 在国内连不上）。
-// 按设备时区判断先用哪家，失败了再换另一家；两个 Key 都没有时不读例句。
+// 网页和 App 都按设备时区判断先用哪家，失败了再换另一家；没有 Key 时不读例句。
 //   Gemini Key：https://aistudio.google.com/apikey
-//   智谱 Key：  https://open.bigmodel.cn （注册后在“API Keys”里创建，GLM-4.5-Flash 等 Flash 模型免费）
+//   智谱 Key：  https://open.bigmodel.cn （注册后在“API Keys”里创建，GLM-4.7-Flash、GLM-4V-Flash 等 Flash 模型免费）
 import { useEffect, useState } from 'react';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { prepareEnglishAudio } from './tts';
+import { assetBase } from './clipPlayer';
 
 // Key 不进 Git（仓库公开会被自动停用）：本地放在 .env.local，Netlify 在环境变量里配置
 const GEMINI_API_KEY: string = process.env.GEMINI_API_KEY || '';
 const ZHIPU_API_KEY: string = process.env.ZHIPU_API_KEY || '';
 // 轻量模型够用且快；第一个失败（繁忙/下线）时依次换下一个
 const GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
-const ZHIPU_MODELS = ['glm-4.5-flash', 'glm-4-flash-250414', 'glm-4-flash'];
+// 稳定优先：glm-4-flash 快又很少被限流（实测约 2 秒）；新模型常报“访问量过大”，只做备用
+const ZHIPU_MODELS = ['glm-4-flash', 'glm-4-flash-250414', 'glm-4.7-flash'];
 
 export type SentenceLang = 'en' | 'zh';
 
@@ -117,6 +119,12 @@ type Provider = 'gemini' | 'zhipu';
 const coolDown: Record<Provider, number> = { gemini: 0, zhipu: 0 }; // 被限流后暂停一会儿
 
 // 发 POST 请求：App 里走原生网络（没有浏览器跨域限制），网页里用 fetch；超时算失败
+// 智谱不允许网页跨域直连：App 用原生请求直连，网页经同域转发（本地 .umirc.ts、线上 netlify.toml）
+const zhipuUrl = () =>
+  Capacitor.isNativePlatform()
+    ? 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    : `${assetBase()}/zhipu/api/paas/v4/chat/completions`;
+
 const postJson = async (url: string, headers: Record<string, string>, body: unknown, timeoutMs = 10000) => {
   const allHeaders = { 'Content-Type': 'application/json', ...headers };
   if (Capacitor.isNativePlatform()) {
@@ -159,9 +167,10 @@ const askGemini = async (prompt: string): Promise<string | null> => {
 };
 
 const askZhipu = async (prompt: string): Promise<string | null> => {
+  let busy = 0;
   for (const model of ZHIPU_MODELS) {
     const { status, data } = await postJson(
-      'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+      zhipuUrl(),
       { Authorization: `Bearer ${ZHIPU_API_KEY}` },
       {
         model,
@@ -170,11 +179,13 @@ const askZhipu = async (prompt: string): Promise<string | null> => {
         thinking: { type: 'disabled' }, // 不需要深度思考，关掉更快
       },
     );
-    if (status === 429) { coolDown.zhipu = Date.now() + 30_000; return null; }
+    // 智谱免费模型是按模型限流的（“访问量过大”），换下一个模型往往就行
+    if (status === 429) { busy++; continue; }
     if (status < 200 || status >= 300) continue;
     const text: string = data?.choices?.[0]?.message?.content || '';
     if (text) return text;
   }
+  if (busy === ZHIPU_MODELS.length) coolDown.zhipu = Date.now() + 30_000; // 全都忙才暂停
   return null;
 };
 
@@ -283,4 +294,116 @@ export const useSentences = (lang: SentenceLang, words: { word: string; hint?: s
     const timer = setTimeout(() => words.forEach(w => prefetchSentence(lang, w.word, w.hint)), 2000);
     return () => clearTimeout(timer);
   }, [lang, key]);
+};
+
+// ---------------- 拍照识别：从课本 / 练习册照片里找出要学的单词和例句 ----------------
+
+export interface PhotoWord {
+  en: string;
+  zh: string;
+  sentence?: string;
+  sentenceZh?: string;
+}
+
+const PHOTO_PROMPT = `This is a photo of a primary-school English textbook or workbook page.
+Find the English vocabulary words the child is learning on this page, and the example sentences on the page that use them.
+Output JSON only, in this exact shape:
+{"words":[{"en":"lettuce","zh":"生菜","sentence":"He gulps down the lettuce.","sentence_zh":"他大口吞下生菜。"}]}
+Rules:
+- "en": the vocabulary word in lowercase (a word or short phrase), spelled correctly.
+- "zh": a short, simple Chinese meaning.
+- "sentence": copy the example sentence from the page exactly if the page has one using this word; otherwise "".
+- "sentence_zh": simple Chinese translation of the sentence, or "".
+- Do not include instruction words (write, box, check, sound, letters...), page numbers or names.`;
+
+const parsePhotoWords = (text: string): PhotoWord[] => {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return [];
+  try {
+    const list = JSON.parse(m[0])?.words;
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((w: any) => ({
+        en: String(w?.en || '').trim().toLowerCase().replace(/-/g, ''),
+        zh: String(w?.zh || '').trim(),
+        sentence: String(w?.sentence || '').trim() || undefined,
+        sentenceZh: String(w?.sentence_zh || '').trim() || undefined,
+      }))
+      .filter(w => /^[a-z][a-z' ]*$/.test(w.en));
+  } catch {
+    return [];
+  }
+};
+
+const photoGemini = async (base64: string, mime: string): Promise<string | null> => {
+  for (const model of GEMINI_MODELS) {
+    const { status, data } = await postJson(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      { 'x-goog-api-key': GEMINI_API_KEY },
+      {
+        contents: [{ parts: [{ text: PHOTO_PROMPT }, { inline_data: { mime_type: mime, data: base64 } }] }],
+        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+      },
+      30000,
+    );
+    if (status === 429) return null;
+    if (status < 200 || status >= 300) continue;
+    const text: string = (data?.candidates?.[0]?.content?.parts || []).map((p: any) => (p.thought ? '' : p.text || '')).join('');
+    if (text) return text;
+  }
+  return null;
+};
+
+// 智谱免费的视觉模型：glm-4v-flash 稳定、识别课本足够；4.6v 常繁忙，做备用
+const ZHIPU_VISION_MODELS = ['glm-4v-flash', 'glm-4.6v-flash'];
+const photoZhipu = async (base64: string, mime: string): Promise<string | null> => {
+  for (const model of ZHIPU_VISION_MODELS) {
+    const { status, data } = await postJson(
+      zhipuUrl(),
+      { Authorization: `Bearer ${ZHIPU_API_KEY}` },
+      {
+        model,
+        temperature: 0.2,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
+            { type: 'text', text: PHOTO_PROMPT },
+          ],
+        }],
+      },
+      30000,
+    );
+    if (status < 200 || status >= 300) continue; // 包括 429：这个模型忙就换下一个
+    const text: string = data?.choices?.[0]?.message?.content || '';
+    if (text) return text;
+  }
+  return null;
+};
+
+/** 识别照片里的单词和例句；两家都失败时返回 null，没认出单词返回空数组 */
+export const recognizePhotoWords = async (base64: string, mime = 'image/jpeg'): Promise<PhotoWord[] | null> => {
+  let anyAnswer = false;
+  for (const p of providers()) {
+    try {
+      const text = p === 'gemini' ? await photoGemini(base64, mime) : await photoZhipu(base64, mime);
+      if (!text) continue;
+      anyAnswer = true;
+      const words = parsePhotoWords(text);
+      if (words.length) return words;
+    } catch {}
+  }
+  return anyAnswer ? [] : null;
+};
+
+/** 给一个词追加例句（已有的保留，重复的不加）；书上的例句会优先使用 */
+export const appendSentences = (lang: SentenceLang, word: string, hint: string | undefined, add: Sentence[]) => {
+  const key = cacheKey(lang, word, hint);
+  const old = readCache(key) || [];
+  const seen = new Set(old.map(s => s.text.trim().toLowerCase()));
+  const fresh = add.filter(s => s.text.trim() && !seen.has(s.text.trim().toLowerCase()));
+  if (!fresh.length) return;
+  writeCache(key, [...fresh, ...old]);
+  turn.set(key, 0); // 下次先读书上的例句
+  if (lang === 'en') fresh.forEach(s => prepareEnglishAudio(s.text));
 };

@@ -10,19 +10,21 @@
 .game-title {
   text-align: center;
   color: white;
-  margin-bottom: 60px;
+  margin-bottom: 40px;
 
   h1 {
-    font-size: 56px;
+    font-size: 52px;
     margin: 0;
+    letter-spacing: 6px;
     text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     font-weight: bold;
   }
 
   .subtitle {
-    font-size: 24px;
-    margin-top: 10px;
+    font-size: 22px;
+    margin: 8px 0 0;
     opacity: 0.9;
+    letter-spacing: 1px;
   }
 }
 
@@ -54,6 +56,10 @@
   transition: all 0.3s ease;
   border: 4px solid;
   position: relative;
+  display: flex;
+  flex-direction: column;
+
+  .level-text { flex: 1; }
 
   &:hover {
     transform: translateY(-10px);
@@ -89,6 +95,7 @@
   }
 
   .start-btn {
+    margin-top: auto; // 按钮统一贴在卡片底部，说明长短不同也对齐
     width: 100%;
     padding: 12px;
     border: none;
@@ -137,28 +144,70 @@
   }
 }
 
-/* 横屏手机这类矮屏幕：标题缩小，卡片排成一行 */
-@media (max-height: 500px) {
+/* 手机竖屏：卡片改成横排（左图标、右文字），去掉按钮，整张卡片可点，三张一屏放下 */
+@media (max-width: 600px) {
   .home-page {
-    padding: 16px 20px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: max(16px, env(safe-area-inset-top)) 16px 16px;
+    justify-content: center;
   }
 
   .game-title {
     margin-bottom: 28px;
+    h1 { font-size: 40px; }
+    .subtitle { font-size: 17px; margin-top: 6px; }
+  }
 
-    h1 {
-      font-size: 32px;
+  .level-cards {
+    gap: 16px;
+    margin-bottom: 0;
+  }
+
+  .level-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 16px;
+    border-width: 3px;
+
+    &:hover { transform: none; }
+    &:active { transform: scale(0.98); }
+
+    .level-number {
+      position: static;
+      flex-shrink: 0;
+      width: 64px;
+      height: 64px;
+      font-size: 34px;
     }
 
-    .subtitle {
-      font-size: 15px;
-      margin-top: 4px;
-    }
+    .level-text { min-width: 0; }
+    h2 { margin: 0 0 4px; font-size: 22px; }
+    p { margin: 0; font-size: 14px; }
+    .start-btn { display: none; }
+  }
+}
+
+/* 横屏手机这类矮屏幕：卡片排成一行，竖向居中 */
+@media (max-height: 500px) {
+  .home-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 16px 20px;
+    justify-content: center;
+  }
+
+  .game-title {
+    margin-bottom: 26px;
+    h1 { font-size: 30px; letter-spacing: 4px; }
+    .subtitle { font-size: 14px; margin-top: 2px; }
   }
 
   .level-cards {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    margin-bottom: 24px;
+    margin-bottom: 0;
   }
 
   .level-card {

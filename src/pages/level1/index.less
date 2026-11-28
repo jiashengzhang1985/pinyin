@@ -170,28 +170,6 @@
     height: 100%;
   }
 
-  .compact-toolbar {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 5;
-    display: flex;
-    gap: 8px;
-
-    button {
-      width: 44px;
-      height: 44px;
-      border: none;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.15);
-      font-size: 22px;
-      line-height: 44px;
-      padding: 0;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-  }
-
   .config-backdrop {
     position: fixed;
     inset: 0;
@@ -233,5 +211,31 @@
     background: #667eea;
     color: #fff;
     font-size: 16px;
+  }
+}
+
+// 游戏区右上角的 🏠（所有设备）和 ⚙️（触屏）
+.level-page .game-area {
+  position: relative;
+}
+.level-page .compact-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+
+  button {
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    font-size: 22px;
+    line-height: 44px;
+    padding: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
 }

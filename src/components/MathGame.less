@@ -1,0 +1,461 @@
+.math-game {
+  height: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #1f2937;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.math-tabs {
+  display: flex;
+  gap: 8px;
+  padding-right: 60px; // 给右上角 🏠 ⚙️ 留位置
+
+  button {
+    flex: 1;
+    padding: 10px 6px;
+    border: 3px solid var(--c);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--c);
+    font-size: 20px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.1s;
+
+    &.active {
+      background: var(--c);
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    }
+  }
+}
+
+// 题目卡片上方飘过的提示（满十进一、开启暴击、口诀背会了……）
+.tip-float {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  z-index: 5;
+  white-space: nowrap;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 20px;
+  color: #fff;
+  background: #7c3aed;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+  pointer-events: none;
+  animation: tip-float 1.8s ease-out forwards;
+
+  &.carry { background: #ef4444; }
+  &.big { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+}
+@keyframes tip-float {
+  0% { transform: translate(-50%, 10px) scale(0.8); opacity: 0; }
+  12% { transform: translate(-50%, 0) scale(1.05); opacity: 1; }
+  20%, 80% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -16px); opacity: 0; }
+}
+
+// ---------- 题目区 ----------
+.math-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+}
+
+.question-card {
+  flex: 1;
+  min-width: 0;
+  background: #fffdf5;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  overflow: auto;
+  container-type: inline-size;
+  position: relative;
+
+  .recite-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 18px;
+
+    button {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 10px;
+      background: #f59e0b;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  }
+
+  .explain {
+    min-height: 32px;
+    font-size: 22px;
+    color: #7c3aed;
+    font-weight: 600;
+    text-align: center;
+
+    .prev { font-size: 16px; color: #94a3b8; font-weight: 400; margin-bottom: 4px; }
+  }
+}
+
+.math-main:has(.koujue-panel) .horizontal { font-size: clamp(26px, 9.5cqw, 64px); gap: 0.15em; }
+
+.question {
+  &.shake { animation: shake 0.4s; }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-10px); }
+  40%, 80% { transform: translateX(10px); }
+}
+
+.horizontal {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 64px;
+  font-weight: 800;
+  font-family: 'Arial Rounded MT Bold', 'Helvetica Neue', Arial, sans-serif;
+
+  .op { color: #ef4444; }
+  .op.dots { color: #64748b; font-size: 40px; }
+
+  .ans {
+    min-width: 1.6em;
+    padding: 0 8px;
+    border-bottom: 5px solid #94a3b8;
+    text-align: center;
+    color: #2563eb;
+
+    &.rem { min-width: 1em; }
+    &.cursor { border-bottom-color: #f59e0b; background: #fff7d6; border-radius: 8px 8px 0 0; }
+    &.ok { color: #16a34a; border-bottom-color: #16a34a; }
+  }
+}
+
+.vertical {
+  --cell: 56px;
+  font-size: 48px;
+  font-weight: 800;
+  font-family: 'Courier New', monospace;
+
+  .v-row {
+    display: grid;
+    grid-template-columns: repeat(var(--w), var(--cell));
+    text-align: center;
+
+    span {
+      height: var(--cell);
+      line-height: var(--cell);
+      border-radius: 6px;
+      position: relative;
+    }
+    .hl { background: #fff1b8; }
+    .op { color: #ef4444; }
+  }
+
+  .v-borrow span, .v-carry span {
+    height: 22px;
+    line-height: 22px;
+    font-size: 22px;
+  }
+  .v-borrow .dot { color: #ef4444; font-style: normal; font-size: 34px; display: inline-block; animation: pop-in 0.5s; }
+  .v-carry .one { color: #ef4444; font-style: normal; display: inline-block; animation: carry-in 0.6s; position: relative; left: 14px; }
+
+  .v-line {
+    height: 4px;
+    background: #334155;
+    margin: 2px 0 6px;
+    border-radius: 2px;
+  }
+
+  .v-ans span.box {
+    border: 2px dashed #cbd5e1;
+    margin: 0 3px;
+    color: #16a34a;
+  }
+  .v-ans span.cursor { border-color: #f59e0b; border-style: solid; animation: blink-border 1s infinite; }
+  .v-ans .pop { display: inline-block; animation: pop-in 0.35s; }
+
+  .v-place span {
+    height: 24px;
+    line-height: 24px;
+    font-size: 15px;
+    color: #94a3b8;
+    font-weight: 400;
+    font-family: sans-serif;
+  }
+}
+@keyframes pop-in {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+@keyframes carry-in {
+  0% { transform: translate(var(--cell, 56px), 40px) scale(1.6); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes blink-border {
+  50% { border-color: transparent; }
+}
+
+// ---------- 口诀表 ----------
+.koujue-panel {
+  width: 56%;
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: 16px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  overflow: auto;
+
+  .kj-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    margin-bottom: 6px;
+
+    button {
+      border: none;
+      background: #eef2ff;
+      border-radius: 8px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+  }
+
+  .kj-table { container-type: inline-size; }
+
+  .kj-row {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 4px;
+    align-items: center;
+
+    &.current { background: #fff7d6; border-radius: 6px; }
+  }
+
+  .kj-star { width: 20px; flex-shrink: 0; font-size: 13px; }
+
+  .kj-cell {
+    flex: 0 0 calc((100% - 8 * 3px) / 9);
+    font-size: clamp(9px, 2.8cqw, 20px);
+    letter-spacing: -0.3px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    padding: 5px 0;
+    text-align: center;
+    background: #f1f5f9;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    cursor: pointer;
+
+    &.now { background: #fde68a; font-weight: 700; }
+    &.reading { background: #f59e0b; color: #fff; transform: scale(1.1); }
+  }
+}
+
+// ---------- 数字键盘 ----------
+// 两排：每排 5 个数字 + 2 个功能键
+.num-pad {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr) repeat(2, 1.1fr);
+  gap: 6px;
+  flex-shrink: 0;
+
+  .np-key {
+    min-width: 0;
+    height: 50px;
+    border: none;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+    box-shadow: 0 3px 0 #94a3b8;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+
+    &.wide { grid-column: span 2; }
+    &.fn { background: #e0e7ff; }
+    &.ok { background: #22c55e; color: #fff; box-shadow: 0 3px 0 #15803d; }
+    &.is-pressed { transform: translateY(3px); box-shadow: none; }
+  }
+}
+
+// 电脑上整块固定一屏高，数字键盘不被挤出去
+.level-page:not(.compact) .math-game {
+  height: calc(100vh - 40px);
+}
+
+// ---------- 背口诀：点读口诀表 ----------
+.recite-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fffdf5;
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  container-type: inline-size;
+
+  .recite-show {
+    height: clamp(64px, 14vh, 110px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .recite-eq {
+    font-size: clamp(40px, 8vh, 76px);
+    font-weight: 800;
+    color: #1f2937;
+    animation: pop-in 0.3s;
+
+    .op { color: #ef4444; }
+    b { color: #f59e0b; }
+  }
+
+  .recite-tip { font-size: 20px; color: #7c3aed; font-weight: 600; }
+
+  .recite-table {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: repeat(9, 1fr);
+    gap: 5px;
+  }
+
+  .rt-row {
+    display: grid;
+    grid-template-columns: 0.6fr repeat(9, 1fr);
+    gap: 5px;
+    min-height: 0;
+  }
+
+  .rt-play, .rt-cell {
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    padding: 0;
+    min-height: 0;
+  }
+
+  .rt-play {
+    background: #f59e0b;
+    color: #fff;
+    font-size: clamp(12px, 2cqw, 20px);
+
+    &.playing { background: #ef4444; }
+  }
+
+  .rt-cell {
+    background: #eef2ff;
+    color: #1e293b;
+    font-weight: 700;
+    font-size: clamp(10px, 2.1cqw, 24px);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    box-shadow: 0 2px 0 #c7d2fe;
+
+    &:active { transform: translateY(2px); box-shadow: none; }
+    &.on { background: #fde68a; box-shadow: 0 2px 0 #f59e0b; transform: scale(1.06); }
+  }
+}
+
+// ---------- 触屏 / 手机布局 ----------
+// 右上角有 🏠 ⚙️ 两个圆按钮，标签栏给它们让出位置
+.level-page.compact .math-tabs { padding-right: 104px; }
+
+@media (max-width: 760px) {
+  .math-main { flex-direction: column; }
+  .koujue-panel { width: auto; max-width: none; flex-shrink: 1; }
+  .horizontal { font-size: 44px; }
+}
+
+// 横屏矮屏（手机横着拿）：标签栏、键盘都压成一行，把空间让给题目
+@media (max-height: 500px) {
+  .math-game { gap: 6px; }
+  .math-tabs button { padding: 5px 4px; font-size: 16px; border-width: 2px; border-radius: 10px; }
+  // 题目和讲解左右排，竖式不被挤掉
+  .question-card { padding: 6px 10px; gap: 20px; flex-direction: row; }
+  .question-card .explain { font-size: 17px; min-height: 0; max-width: 45%; text-align: left; }
+  .horizontal { font-size: 40px; }
+  .vertical { --cell: 34px; font-size: 30px; }
+  .vertical .v-borrow span, .vertical .v-carry span { height: 14px; line-height: 14px; font-size: 16px; }
+  .vertical .v-place { display: none; }
+  .num-pad {
+    display: flex;
+    gap: 5px;
+    .np-key { flex: 1 1 0; height: 44px; font-size: 22px; }
+    .np-key.wide { flex-grow: 2; }
+  }
+  // 横屏时题目和口诀表左右排，不要上下挤
+  .math-main { flex-direction: row; }
+  .math-main:has(.koujue-panel) .koujue-panel { padding: 6px; width: 50%; flex-shrink: 0; }
+  .recite-board { padding: 8px; .recite-show { height: 52px; } .recite-eq { font-size: 40px; } }
+}
+
+// 竖屏窄屏（手机竖着拿）：键盘排成 5 列的大按键
+@media (max-width: 600px) and (min-height: 501px) {
+  // 点读口诀表一行 9 格太窄：每格分两行写，上“7×8”下“=56”
+  .recite-board {
+    padding: 8px;
+    .rt-row { grid-template-columns: 0.55fr repeat(9, 1fr); gap: 3px; }
+    .recite-table { gap: 3px; }
+    .rt-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(9px, 3.3cqw, 15px);
+      letter-spacing: -0.3px;
+      .rt-res { font-size: 1.2em; color: #b45309; }
+    }
+  }
+  .math-tabs { gap: 5px; }
+  .math-tabs button { padding: 8px 2px; font-size: 15px; border-width: 2px; }
+  .question-card { padding: 10px; gap: 8px; }
+  .question-card .explain { font-size: 17px; }
+  .vertical { --cell: 40px; font-size: 34px; }
+  .num-pad { gap: 5px; .np-key { height: 48px; font-size: 22px; } }
+  // 乘除法练习带口诀表：题目卡保持原高，口诀表用剩下的空间（放不下就滚动），战场压矮一点
+  .math-game:has(.koujue-panel) .battle { --h: 200px; }
+  .math-main:has(.koujue-panel) {
+    .question-card { flex: 0 0 auto; overflow: visible; }
+    .koujue-panel { flex: 1 1 auto; min-height: 0; padding: 8px; }
+    .kj-head { margin-bottom: 4px; font-size: 15px; }
+    .kj-row { margin-bottom: 3px; }
+    .kj-cell { padding: 3px 0; }
+  }
+}

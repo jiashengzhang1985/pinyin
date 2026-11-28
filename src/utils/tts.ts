@@ -6,7 +6,7 @@
 import { Capacitor } from '@capacitor/core';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
 import { cacheAudio, cachedAudioUrl } from './audioCache';
-import { loadClip, playClipBuffer } from './clipPlayer';
+import { assetBase, loadClip, playClipBuffer, playClipSlow } from './clipPlayer';
 
 export const isNativeApp = Capacitor.isNativePlatform();
 
@@ -91,76 +91,85 @@ const playElement = (audio: HTMLAudioElement, timeoutMs: number) =>
     audio.play().catch(() => { clearTimeout(fail); resolve(false); });
   });
 
-// 英文用有道词典的美式发音（单词是真人录音，国内外都能访问），网页和 App 都一样：
-// - App 里配置时已在后台下载到手机里的，直接播放本地文件
-// - 目标出现时就预先加载好，击中后立即出声，不用等联网
-// - 有道连不上时 5 分钟内不再尝试，直接用系统语音，免得每次都等
-const youdaoUrl = (text: string) => {
+// 英文用有道词典的美式发音（单词是真人录音，国内外都能访问），网页和 App 都一样。
+// 配置好单词、生成好例句后就在后台准备好，玩的时候直接播放（去掉前后静音）：
+// - App：下载到手机里（离线可用），再解码到内存
+// - 网页：经 Netlify 转发（/yd/，同域才能读取声音数据）下载并解码；转发不可用时退回普通预加载
+// 有道读不了的句子（部分句子会报错），直接用系统语音，不再等。
+const youdaoPath = (text: string) => {
   const t = text.trim().replace(/\s+/g, ' ');
-  return `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(t.includes(' ') ? t : t.toLowerCase())}&type=2`;
+  return `dictvoice?audio=${encodeURIComponent(t.includes(' ') ? t : t.toLowerCase())}&type=2`;
 };
-let youdaoDownUntil = 0;
-const youdaoDown = () => Date.now() < youdaoDownUntil;
+const youdaoUrl = (text: string) => `https://dict.youdao.com/${youdaoPath(text)}`;
 
-// 已准备好的英文发音：
-// - App：下载到手机里并解码到内存的本地文件地址（播放无需联网、无需等待）
-// - 网页：预先加载好的 <audio>（有道不允许网页直接读取数据，只能这样预加载）
-const readyLocal = new Map<string, string>();
-const readyWeb = new Map<string, HTMLAudioElement>();
+const readyClip = new Map<string, string>();               // 已解码好的声音地址
+const readyWeb = new Map<string, HTMLAudioElement>();      // 网页后备：预加载好的 <audio>
+const badUntil = new Map<string, number>();                // 有道读不了，这段时间内直接用系统语音
 const preparing = new Map<string, Promise<void>>();
+
+const isBad = (key: string) => (badUntil.get(key) || 0) > Date.now();
+const markBad = (key: string) => { if (navigator.onLine !== false) badUntil.set(key, Date.now() + 10 * 60_000); };
+
+// 网页后备：普通 <audio> 预加载，等到能播放或出错
+const preloadElement = (url: string) =>
+  new Promise<HTMLAudioElement | null>(resolve => {
+    const audio = new Audio();
+    const timer = setTimeout(() => resolve(null), 8000);
+    audio.preload = 'auto';
+    audio.oncanplaythrough = () => { clearTimeout(timer); resolve(audio); };
+    audio.onerror = () => { clearTimeout(timer); resolve(null); };
+    audio.src = url;
+    audio.load();
+  });
 
 /**
  * 提前准备好一段英文的发音。配置好单词、生成好例句后就在后台调用，
- * 玩的时候直接播放。重复调用只准备一次。
+ * 玩的时候直接播放。重复调用只准备一次，失败的稍后重试。
  */
 export const prepareEnglishAudio = (text: string): Promise<void> => {
   if (!text.trim()) return Promise.resolve();
-  const url = youdaoUrl(text);
-  let p = preparing.get(url);
+  const key = youdaoUrl(text);
+  if (readyClip.has(key) || readyWeb.has(key) || isBad(key)) return Promise.resolve();
+  let p = preparing.get(key);
   if (!p) {
     p = (async () => {
       if (isNativeApp) {
-        await cacheAudio(url);
-        const local = await cachedAudioUrl(url);
-        if (local) {
-          await loadClip(local);
-          readyLocal.set(url, local);
-        }
-      } else {
-        const audio = new Audio();
-        audio.preload = 'auto';
-        audio.src = url;
-        audio.load();
-        readyWeb.set(url, audio);
+        await cacheAudio(key);
+        const local = await cachedAudioUrl(key);
+        if (local && (await loadClip(local))) readyClip.set(key, local);
+        else markBad(key);
+        return;
       }
-    })();
-    // 没准备成功的（断网等），下次再调用时重试
-    p.then(() => { if (!readyLocal.has(url) && !readyWeb.has(url)) preparing.delete(url); });
-    preparing.set(url, p);
+      const proxied = `${assetBase()}/yd/${youdaoPath(text)}`;
+      if (await loadClip(proxied)) { readyClip.set(key, proxied); return; }
+      const el = await preloadElement(key);
+      if (el) readyWeb.set(key, el);
+      else markBad(key);
+    })().finally(() => preparing.delete(key));
+    preparing.set(key, p);
   }
   return p;
 };
 export const preloadEnglish = prepareEnglishAudio;
 
-const speakEnglishAudio = async (text: string) => {
-  const url = youdaoUrl(text);
-  // App：已下载的本地发音
-  const local = readyLocal.get(url) || (isNativeApp ? await cachedAudioUrl(url) : null);
-  if (local && (await playClipBuffer(local))) return true;
-  // 网页：预先加载好的，可反复播放
-  const web = readyWeb.get(url);
-  if (web) {
-    web.currentTime = 0;
-    if (await playElement(web, 3000)) return true;
-    readyWeb.delete(url);
-    preparing.delete(url);
+const speakEnglishAudio = async (text: string, speed = 1): Promise<boolean> => {
+  const key = youdaoUrl(text);
+  if (isBad(key)) return false;
+  // 还没准备好（刚录入）：最多等 1.5 秒，等不到就用系统语音
+  if (!readyClip.has(key) && !readyWeb.has(key)) {
+    await Promise.race([prepareEnglishAudio(text), new Promise(r => setTimeout(r, 1500))]);
   }
-  // 都没有（刚录入还没准备好）：临时联网播放，同时准备下次用
-  if (youdaoDown()) return false;
-  prepareEnglishAudio(text);
-  const ok = await playElement(new Audio(url), 4000);
-  if (!ok) youdaoDownUntil = Date.now() + 5 * 60_000;
-  return ok;
+  const clip = readyClip.get(key);
+  if (clip && (speed !== 1 ? await playClipSlow(clip, speed) : await playClipBuffer(clip))) return true;
+  const el = readyWeb.get(key);
+  if (el) {
+    el.currentTime = 0;
+    el.playbackRate = speed;
+    (el as any).preservesPitch = true;
+    if (await playElement(el, 3000)) return true;
+    readyWeb.delete(key);
+  }
+  return false;
 };
 
 const speakNative = async (text: string, lang: TtsLang, rate: number) => {
@@ -173,12 +182,27 @@ const speakNative = async (text: string, lang: TtsLang, rate: number) => {
   ]);
 };
 
-/** 朗读一段文字，读完后返回 */
-export const speak = async (text: string, lang: TtsLang = 'zh-CN', rate = 0.9) => {
+/**
+ * 朗读一段文字，读完后返回。
+ * rate：系统语音的语速；audioSpeed：英文录音（有道）的播放速度，小于 1 表示放慢（音调不变）
+ */
+export const speak = async (text: string, lang: TtsLang = 'zh-CN', rate = 0.9, audioSpeed = 1) => {
   if (!text.trim()) return;
   speakingCount++;
   try {
-    if (lang === 'en-US' && (await speakEnglishAudio(text))) return;
+    if (lang === 'en-US' && (await speakEnglishAudio(text, audioSpeed))) return;
+    if (isNativeApp) await speakNative(text, lang, rate);
+    else await speakWeb(text, lang, rate);
+  } finally {
+    speakingCount--;
+  }
+};
+
+/** 只用系统自带语音朗读（不联网、不下载有道录音），读完后返回。加减乘除这类固定内容用它 */
+export const speakOffline = async (text: string, lang: TtsLang = 'zh-CN', rate = 0.9) => {
+  if (!text.trim()) return;
+  speakingCount++;
+  try {
     if (isNativeApp) await speakNative(text, lang, rate);
     else await speakWeb(text, lang, rate);
   } finally {
